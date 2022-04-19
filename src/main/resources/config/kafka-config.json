@@ -1,0 +1,6 @@
+{
+  "topic_origin": "test_origin",
+  "topic_kpi": "test",
+  "url": "192.168.1.146:9092",
+  "report_cycle": 2
+}
