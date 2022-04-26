@@ -44,4 +44,10 @@ public class DeviceInfo {
      */
     @Alias("描述")
     private String kpIid;
+
+    /**
+     * 系数
+     */
+    @Alias("系数")
+    private Double ratio = 0.0D;
 }

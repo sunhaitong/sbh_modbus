@@ -28,59 +28,6 @@ import java.util.Map;
 @Component
 @Slf4j
 public class ModbusRunner {
-
-    private final  List<String> convertList = new ArrayList<String>() {
-        {
-            this.add("高压侧电压A相");
-            this.add("高压侧电压B相");
-            this.add("高压侧电压C相");
-            this.add("高压侧电压AB相");
-            this.add("高压侧电压BC相");
-            this.add("高压侧电压CA相");
-            this.add("低压侧电压A相");
-            this.add("低压侧电压B相");
-            this.add("低压侧电压C相");
-            this.add("低压侧电压AB相");
-            this.add("低压侧电压BC相");
-            this.add("低压侧电压CA相");
-            this.add("Uab");
-            this.add("Ubc");
-            this.add("Uca");
-            this.add("Ua");
-            this.add("Ub");
-            this.add("Uc");
-            this.add("Ucb");
-            this.add("一次测量电压A相");
-            this.add("一次测量电压B相");
-            this.add("一次测量电压C相");
-            this.add("一次测量电压AB相");
-            this.add("一次测量电压BC相");
-            this.add("一次测量电压CA相");
-            this.add("总开关Ua");
-            this.add("总开关Ub");
-            this.add("总开关Uc");
-            this.add("总开关Uab");
-            this.add("总开关Ucb");
-            this.add("总开关Uca");
-            this.add("零序电流");
-            this.add("35kV侧Ua1");
-            this.add("35kV侧Ub1");
-            this.add("35kV侧Uc1");
-            this.add("35kV侧U1x");
-            this.add("35kV侧Uab1");
-            this.add("35kV侧Ucb1");
-            this.add("35kV侧Uca1");
-            this.add("6kV侧I母PTUa2");
-            this.add("6kV侧I母PTUb2");
-            this.add("6kV侧I母PTUc2");
-            this.add("6kV侧I母PTU2x");
-            this.add("6kV侧I母PTUab2");
-            this.add("6kV侧I母PTUcb2");
-            this.add("6kV侧I母PTUca2");
-        }
-    };
-
-
     private int count = 100;
     // 每天5分钟提取一次
     @Scheduled(cron = "0 1/5 * * * ?")
@@ -155,13 +102,18 @@ public class ModbusRunner {
                         if (host.equals("192.169.1.222")) {
                             data.setValue(value * 0.1);
                         } else if (host.equals("192.169.1.223")) {
-                            if (deviceInfo.getKpIid().endsWith("电压") || convertList.contains(deviceInfo.getKpIid())) {
+                            if (deviceInfo.getRatio() != null && deviceInfo.getRatio() != 0.0D) {
+                                data.setValue(value * deviceInfo.getRatio());
+                            } else {
+                                data.setValue(value);
+                            }
+                            /*if (deviceInfo.getKpIid().endsWith("电压") || convertList.contains(deviceInfo.getKpIid())) {
                                 data.setValue(value * 0.001);
                             } else if (deviceInfo.getKpIid().equals("频率")) {
                                 data.setValue(value * 0.014652);
                             } else {
                                 data.setValue(value);
-                            }
+                            }*/
                         } else {
                             data.setValue(value);
                         }
