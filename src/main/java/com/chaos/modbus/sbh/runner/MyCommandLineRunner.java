@@ -15,6 +15,6 @@ public class MyCommandLineRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        DataConfigManager.getInstance().loadDataStandardConfig();
+        // DataConfigManager.getInstance().loadDataStandardConfig();
     }
 }
