@@ -29,8 +29,12 @@ import java.util.Map;
 public class ModbusRunner {
     private int count = 100;
     // 每天5分钟提取一次
-    @Scheduled(cron = "0 1/1 * * * ?")
+    @Scheduled(cron = "0 1/40 * * * ?")
     public void getData() {
        ModbusUtils.scheduleTest();
+    }
+
+    public static void main(String[] args) {
+        ModbusUtils.scheduleTest();
     }
 }

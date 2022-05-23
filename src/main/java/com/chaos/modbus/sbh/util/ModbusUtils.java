@@ -43,22 +43,25 @@ public class ModbusUtils {
     /**
      * 南瑞
      */
-    public static ModbusMaster nanruiMaster;
+    public static ModbusMaster master1;
 
     /**
      * 测温
      */
-    public static ModbusMaster temperatureMaster;
+    public static ModbusMaster master2;
 
     /**
      * 氢气
      */
-    public static ModbusMaster hydrogenMaster;
+    public static ModbusMaster master3;
+    public static ModbusMaster master4;
+    public static ModbusMaster master5;
+    public static ModbusMaster master6;
 
     /**
      * 氢气
      */
-    public static ModbusMaster master;
+    public static ModbusMaster master7;
 
 
     /**
@@ -67,46 +70,19 @@ public class ModbusUtils {
      * @return
      * @throws ModbusInitException
      */
-    public static ModbusMaster getMasterForNanRui() throws ModbusInitException {
-
-        if(null == nanruiMaster){
+    public static ModbusMaster getMaster1(String host) throws ModbusInitException {
+        if(null == master1){
             IpParameters params = new IpParameters();
-            params.setHost("192.169.1.223");
-            params.setPort(9035);
-            // TCP 协议
-            ModbusMaster master = modbusFactory.createTcpMaster(params, true);
-            master.setTimeout(5000);
-
-
-            master.init();
-            nanruiMaster = master;
-        }
-
-
-        return nanruiMaster;
-    }
-
-
-    /**
-     * 获取master
-     *
-     * @return
-     * @throws ModbusInitException
-     */
-    public static ModbusMaster getHydrogenMaster() throws ModbusInitException {
-
-        if(null == hydrogenMaster){
-            IpParameters params = new IpParameters();
-            params.setHost("192.169.1.82");
+            params.setHost(host);
             params.setPort(502);
             // TCP 协议
-            ModbusMaster master = modbusFactory.createTcpMaster(params, true);
-            master.setTimeout(5000);
-            master.init();
-            hydrogenMaster = master;
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(3000);
+            ret.init();
+            master1 = ret;
         }
 
-        return hydrogenMaster;
+        return master1;
     }
 
     /**
@@ -115,9 +91,50 @@ public class ModbusUtils {
      * @return
      * @throws ModbusInitException
      */
-    public static ModbusMaster getMaster(String host) throws ModbusInitException {
+    public static ModbusMaster getMaster2(String host) throws ModbusInitException {
+        if(null == master2){
+            IpParameters params = new IpParameters();
+            params.setHost(host);
+            params.setPort(502);
+            // TCP 协议
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(3000);
+            ret.init();
+            master2 = ret;
+        }
 
-        if(null == master){
+        return master2;
+    }
+
+    /**
+     * 获取master
+     *
+     * @return
+     * @throws ModbusInitException
+     */
+    public static ModbusMaster getMaster3(String host) throws ModbusInitException {
+        if(null == master3){
+            IpParameters params = new IpParameters();
+            params.setHost(host);
+            params.setPort(502);
+            // TCP 协议
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(3000);
+            ret.init();
+            master3 = ret;
+        }
+
+        return master3;
+    }
+
+    /**
+     * 获取master
+     *
+     * @return
+     * @throws ModbusInitException
+     */
+    public static ModbusMaster getMaster4(String host) throws ModbusInitException {
+        if(null == master4){
             IpParameters params = new IpParameters();
             params.setHost(host);
             params.setPort(502);
@@ -125,18 +142,11 @@ public class ModbusUtils {
             ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
             ret.setTimeout(5000);
             ret.init();
-            master = ret;
+            master4 = ret;
         }
 
-        return master;
+        return master4;
     }
-
-    public static void closeMaster(){
-        if(null != master){
-            master.destroy();
-        }
-    }
-
 
     /**
      * 获取master
@@ -144,24 +154,64 @@ public class ModbusUtils {
      * @return
      * @throws ModbusInitException
      */
-    public static ModbusMaster getTemperatureMaster() throws ModbusInitException {
-
-        if(null == temperatureMaster){
+    public static ModbusMaster getMaster5(String host) throws ModbusInitException {
+        if(null == master5){
             IpParameters params = new IpParameters();
-            params.setHost("192.169.1.222");
-            params.setPort(9035);
+            params.setHost(host);
+            params.setPort(502);
             // TCP 协议
-            ModbusMaster master = modbusFactory.createTcpMaster(params, true);
-            master.setTimeout(5000);
-
-
-            master.init();
-            temperatureMaster = master;
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(5000);
+            ret.init();
+            master5 = ret;
         }
 
-
-        return temperatureMaster;
+        return master5;
     }
+
+    /**
+     * 获取master
+     *
+     * @return
+     * @throws ModbusInitException
+     */
+    public static ModbusMaster getMaster6(String host) throws ModbusInitException {
+        if(null == master6){
+            IpParameters params = new IpParameters();
+            params.setHost(host);
+            params.setPort(502);
+            // TCP 协议
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(5000);
+            ret.init();
+            master6 = ret;
+        }
+
+        return master6;
+    }
+
+    /**
+     * 获取master
+     *
+     * @return
+     * @throws ModbusInitException
+     */
+    public static ModbusMaster getMaster7(String host) throws ModbusInitException {
+        if(null == master7){
+            IpParameters params = new IpParameters();
+            params.setHost(host);
+            params.setPort(502);
+            // TCP 协议
+            ModbusMaster ret = modbusFactory.createTcpMaster(params, true);
+            ret.setTimeout(5000);
+            ret.init();
+            master7 = ret;
+        }
+
+        return master7;
+    }
+
+
 /*
     *//**
      * 获取master
@@ -181,83 +231,12 @@ public class ModbusUtils {
         return master;
     }*/
 
-    /**
-     * 批量读取
-     * @param host
-     * @param slaveId
-     * @param start
-     * @param end
-     * @param dataType
-     * @return
-     * @throws ModbusInitException
-     * @throws ErrorResponseException
-     * @throws ModbusTransportException
-     */
-    public static BatchResults<Integer> batchReadInput(String host, int slaveId, int start, int end, int dataType) throws ModbusInitException, ErrorResponseException, ModbusTransportException {
-        log.info("read data start:{}, end:{}", start, end);
-        BatchRead<Integer> batch = new BatchRead<Integer>();
-        boolean isLast = end - start < 99;
-        for (int i = start; i <= end; i++) {
-            if (i == end && isLast) {
-                break;
-            }
-            if (dataType == DataType.FOUR_BYTE_FLOAT) {
-                batch.addLocator(i,BaseLocator.holdingRegister(slaveId, i * 2, dataType));
-            } else {
-                batch.addLocator(i,BaseLocator.holdingRegister(slaveId, i, dataType));
-            }
-
-        }
-        ModbusMaster master = null;
-        if (host.equals("192.169.1.223")) {
-            master = getMasterForNanRui();
-        } else if (host.equals("192.169.1.222")) {
-            master = getTemperatureMaster();
-        } else if (host.equals("192.169.1.224")) {
-            master = getHydrogenMaster();
-        }
-        if (null == master) {
-            return new BatchResults<>();
-        }
-        BatchResults<Integer> result = master.send(batch);
-        return result;
-    }
-
-    public static Boolean readCoilStatus(int slaveId, int offset, String host)
-            throws ModbusTransportException, ErrorResponseException, ModbusInitException {
-        // 01 Coil Status
-        BaseLocator<Boolean> loc = BaseLocator.coilStatus(slaveId, offset);
-        ModbusMaster master = getMasterForNanRui();
-        Boolean value = master.getValue(loc);
-        return value;
-    }
-
-
-    /**
-     * 读取03类型数据
-     * @param host
-     * @param slaveId
-     * @param offset
-     * @param dataType
-     * @return
-     * @throws ModbusTransportException
-     * @throws ErrorResponseException
-     * @throws ModbusInitException
-     */
-    public static Number readHoldingRegister(String host, int slaveId, int offset, int dataType)
-            throws ModbusTransportException, ErrorResponseException, ModbusInitException {
-        BaseLocator<Number> loc = BaseLocator.holdingRegister(slaveId, offset, dataType);
-        ModbusMaster master = getHydrogenMaster();
-        Number value = master.getValue(loc);
-        return value;
-    }
 
     public static TestResult batchRead8Input(String host) {
         TestResult result = new TestResult();
-        ModbusMaster master = null;
         result.setHost(host);
         try {
-            master = getMaster(host);
+            ModbusMaster master = getMaster(host);
             if (null == master) {
                 result.setIsMasterOnline(false);
                 return result;
@@ -272,7 +251,7 @@ public class ModbusUtils {
             String isOnline = node1 ? "通" : "不通";
             if (node1) {
                 Number v031 = readInputRegisters(master, 1, 0,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
-                Number v032 = readInputRegisters(master, 1, 1,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
+                Number v032 = readInputRegisters(master, 1, 4,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
                 result.addResult(new Result("油品1温度", 1, isOnline, v031.toString()));
                 result.addResult(new Result("油品1油品", 1, isOnline, v032.toString()));
             } else {
@@ -287,7 +266,7 @@ public class ModbusUtils {
 
             if (node2) {
                 Number v031 = readInputRegisters(master, 2, 0,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
-                Number v032 = readInputRegisters(master, 2, 1,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
+                Number v032 = readInputRegisters(master, 2, 4,  DataType.FOUR_BYTE_FLOAT_SWAPPED);
                 result.addResult(new Result("油品2温度", 2, isOnline2, v031.toString()));
                 result.addResult(new Result("油品2油品", 2, isOnline2, v032.toString()));
             } else {
@@ -336,12 +315,28 @@ public class ModbusUtils {
             e.printStackTrace();
         } catch (ErrorResponseException e) {
             e.printStackTrace();
-        } finally {
-            if (null != master) {
-                master.destroy();
-            }
         }
         return result;
+    }
+
+    private static ModbusMaster getMaster(String host) throws ModbusInitException {
+        switch (host) {
+            case "192.168.1.80":
+                return getMaster1(host);
+            case "192.168.1.81":
+                return getMaster2(host);
+            case "192.168.1.82":
+                return getMaster3(host);
+            case "192.168.1.83":
+                return getMaster4(host);
+            case "192.168.1.84":
+                return getMaster5(host);
+            case "192.168.1.85":
+                return getMaster6(host);
+            case "192.168.1.86":
+                return getMaster7(host);
+        }
+        return null;
     }
 
     /**
@@ -400,7 +395,7 @@ public class ModbusUtils {
         for (String host : hostList) {
             results.add(batchRead8Input(host));
         }
-        SimpleDateFormat sdf = new SimpleDateFormat("MM-ddHH:mm:ss");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-ddHH-mm-ss");
         String fileName = "result-" + sdf.format(new Date( System.currentTimeMillis()));
         File f = new File("D:\\test\\" + fileName + ".txt");
         FileOutputStream fos1= null;
