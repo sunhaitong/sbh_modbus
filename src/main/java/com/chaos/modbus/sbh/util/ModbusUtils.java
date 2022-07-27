@@ -209,4 +209,18 @@ public class ModbusUtils {
         Number value = master.getValue(loc);
         return value;
     }
+
+    public static void main(String[] args) throws ModbusInitException, ModbusTransportException, ErrorResponseException {
+        BaseLocator<Number> loc = BaseLocator.holdingRegister(1, 0, DataType.TWO_BYTE_INT_SIGNED);
+        IpParameters params = new IpParameters();
+        params.setHost("127.0.0.1");
+        params.setPort(502);
+        // TCP 协议
+        ModbusMaster master = modbusFactory.createTcpMaster(params, true);
+        master.setTimeout(5000);
+        master.init();
+        Number value = master.getValue(loc);
+        log.info("===value{}",Double.valueOf(value.toString()));
+
+    }
 }
