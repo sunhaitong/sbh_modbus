@@ -211,16 +211,20 @@ public class ModbusUtils {
     }
 
     public static void main(String[] args) throws ModbusInitException, ModbusTransportException, ErrorResponseException {
-        BaseLocator<Number> loc = BaseLocator.holdingRegister(1, 0, DataType.TWO_BYTE_INT_SIGNED);
+        log.info("===寄存器数量：{}",DataType.getRegisterCount(DataType.FOUR_BYTE_FLOAT));
+        BaseLocator<Number> loc = BaseLocator.holdingRegister(1, 16321, DataType.FOUR_BYTE_FLOAT);
+        BaseLocator<Boolean> booleanBaseLocator = BaseLocator.inputStatus(1, 48);
         IpParameters params = new IpParameters();
-        params.setHost("127.0.0.1");
+        params.setHost("192.168.2.150");
         params.setPort(502);
         // TCP 协议
         ModbusMaster master = modbusFactory.createTcpMaster(params, true);
         master.setTimeout(5000);
         master.init();
-        Number value = master.getValue(loc);
-        log.info("===value{}",Double.valueOf(value.toString()));
+        //Number value = master.getValue(loc);
+        Boolean value = master.getValue(booleanBaseLocator);
+        //log.info("===value:{}",Double.valueOf(value.toString()));
+        log.info("===value:{}",value.toString());
 
     }
 }
