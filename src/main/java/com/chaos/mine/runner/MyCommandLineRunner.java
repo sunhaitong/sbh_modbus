@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.runner;
+package com.chaos.mine.runner;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;

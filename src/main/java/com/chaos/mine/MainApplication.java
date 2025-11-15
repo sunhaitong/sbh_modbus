@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh;
+package com.chaos.mine;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -6,10 +6,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-public class SbhApplication {
+public class MainApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(SbhApplication.class, args);
+        SpringApplication.run(MainApplication.class, args);
     }
 
 }

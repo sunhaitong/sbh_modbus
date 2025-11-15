@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.runner;
+package com.chaos.mine.runner;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

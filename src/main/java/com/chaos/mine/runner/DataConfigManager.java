@@ -1,14 +1,16 @@
-package com.chaos.modbus.sbh.runner;
+package com.chaos.mine.runner;
 
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.chaos.modbus.sbh.entity.DeviceInfo;
-import com.chaos.modbus.sbh.util.JsonUtils;
+import com.chaos.mine.entity.DeviceInfo;
+import com.chaos.mine.entity.ModbusTcpData;
+import com.chaos.mine.util.JsonUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +38,7 @@ public class DataConfigManager {
      */
     private Map<Integer, DeviceInfo> measureDeviceInfoMap = new HashMap<>();
 
+
     /**
      * 温度设备信息对照
      */
@@ -45,6 +48,8 @@ public class DataConfigManager {
      * 氢气
      */
     private Map<Integer, DeviceInfo> hydrogenDeviceInfoMap = new HashMap<>();
+
+    private Map<Integer, DeviceInfo> zuanjingDeviceInfoMap = new HashMap<>();
 
     /**
      * 原始数据topic
@@ -85,6 +90,7 @@ public class DataConfigManager {
      * 遥测设备信息对照表
      */
     private static final String MEASURE_DETAIL_PATH = "config/remote-measure.xls";
+    private static final String ZUANJING_DETAIL_PATH = "config/modbus-tcp.xlsx";
 
 
     private static final String TEMPERATURE_DETAIL_PATH = "config/wireless-temperature.xls";
@@ -126,6 +132,7 @@ public class DataConfigManager {
         signalDeviceInfoMap = JsonUtils.getDevIdList(SIGNAL_DEVICES_PATH);
         measureDeviceInfoMap = JsonUtils.getDevIdList(MEASURE_DETAIL_PATH);
         hydrogenDeviceInfoMap = loadHydrogenDeviceInfoMap();
+        zuanjingDeviceInfoMap = JsonUtils.getDevIdList(ZUANJING_DETAIL_PATH);
     }
 
     private Map<Integer, DeviceInfo> loadHydrogenDeviceInfoMap() {

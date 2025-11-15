@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.util;
+package com.chaos.mine.util;
 
 import com.serotonin.modbus4j.BatchRead;
 import com.serotonin.modbus4j.BatchResults;

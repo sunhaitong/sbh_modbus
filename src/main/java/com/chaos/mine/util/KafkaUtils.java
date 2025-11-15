@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.util;
+package com.chaos.mine.util;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;

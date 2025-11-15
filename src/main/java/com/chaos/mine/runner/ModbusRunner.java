@@ -1,12 +1,12 @@
-package com.chaos.modbus.sbh.runner;
+package com.chaos.mine.runner;
 
 import com.alibaba.fastjson.JSON;
-import com.chaos.modbus.sbh.entity.DeviceInfo;
-import com.chaos.modbus.sbh.entity.ReadOffset;
-import com.chaos.modbus.sbh.entity.SignalData;
-import com.chaos.modbus.sbh.entity.SingleFeatureData;
-import com.chaos.modbus.sbh.util.KafkaUtils;
-import com.chaos.modbus.sbh.util.ModbusUtils;
+import com.chaos.mine.entity.DeviceInfo;
+import com.chaos.mine.entity.ReadOffset;
+import com.chaos.mine.entity.SignalData;
+import com.chaos.mine.entity.SingleFeatureData;
+import com.chaos.mine.util.KafkaUtils;
+import com.chaos.mine.util.ModbusUtils;
 import com.serotonin.modbus4j.BatchResults;
 import com.serotonin.modbus4j.code.DataType;
 import com.serotonin.modbus4j.exception.ErrorResponseException;
@@ -25,7 +25,7 @@ import java.util.Map;
  * @author sunht
  * @date 2022/1/25
  */
-@Component
+//@Component
 @Slf4j
 public class ModbusRunner {
     private int count = 100;

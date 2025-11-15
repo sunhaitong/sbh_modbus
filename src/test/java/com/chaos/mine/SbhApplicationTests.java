@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh;
+package com.chaos.mine;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -1,24 +1,28 @@
-package com.chaos.modbus.sbh.entity;
+package com.chaos.mine.entity;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Data;
-
-import java.util.List;
 
 /**
  * @author sunht
  * @date 2021/11/1
  */
 @Data
-public class MultiFeatureData extends BaseEntity {
-    public MultiFeatureData() {
-        setDataType("DMA");
+public class SingleFeatureData extends BaseEntity {
+    public SingleFeatureData() {
+        setDataType("D");
         setSpecialty("Z");
         setImplType("N");
         setSN("");
     }
-    @JSONField(name = "Values")
-    private List<ValueObject> values;
+    @JSONField(name = "KpiId")
+    private String KpiId;
+
+    @JSONField(name = "Value")
+    private Double Value;
+
+    @JSONField(name = "HasSignal")
+    private Integer HasSignal;
 
     @JSONField(name = "Step")
     private Integer Step = 240;

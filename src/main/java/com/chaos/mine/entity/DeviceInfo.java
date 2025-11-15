@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.entity;
+package com.chaos.mine.entity;
 
 import cn.hutool.core.annotation.Alias;
 import lombok.Data;
@@ -50,4 +50,14 @@ public class DeviceInfo {
      */
     @Alias("系数")
     private Double ratio = 0.0D;
+
+    @Alias("数据类型")
+    private String type;
+
+    @Alias("名称")
+    private String name;
+
+    @Alias("单位")
+    private String unit;
+
 }

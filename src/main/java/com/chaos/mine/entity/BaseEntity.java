@@ -1,4 +1,4 @@
-package com.chaos.modbus.sbh.entity;
+package com.chaos.mine.entity;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Data;
