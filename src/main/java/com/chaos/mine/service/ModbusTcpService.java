@@ -11,6 +11,7 @@ import com.serotonin.modbus4j.exception.ModbusInitException;
 import com.serotonin.modbus4j.exception.ModbusTransportException;
 import com.serotonin.modbus4j.ip.IpParameters;
 import com.serotonin.modbus4j.locator.BaseLocator;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -27,6 +28,11 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class ModbusTcpService {
 
+    @Value("${modbustcp.host:192.168.1.6}")
+    private String host;
+    @Value("${modbustcp.port:502}")
+    private int port;
+
     private ModbusMaster master;
     private final Map<String, Object> resultMap = new HashMap<>();
 
@@ -37,8 +43,8 @@ public class ModbusTcpService {
         try {
             // TCP 参数
             IpParameters params = new IpParameters();
-            params.setHost("192.168.1.6");
-            params.setPort(502);
+            params.setHost(host);
+            params.setPort(port);
 
             ModbusFactory factory = new ModbusFactory();
             master = factory.createTcpMaster(params, true);

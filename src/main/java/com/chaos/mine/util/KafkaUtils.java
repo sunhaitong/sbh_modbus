@@ -19,7 +19,7 @@ import java.util.concurrent.Future;
  * @author sunht
  * @date 2021/12/15
  */
-@Component
+// @Component
 @Slf4j
 public class KafkaUtils {
 

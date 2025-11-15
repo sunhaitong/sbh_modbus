@@ -118,7 +118,7 @@ public class DataConfigManager {
         loadDeviceDetail();
 
         //  加载kafka配置
-        loadKafkaConfig();
+        //loadKafkaConfig();
 
     }
 
@@ -128,10 +128,6 @@ public class DataConfigManager {
      * 加载设备信息配置
      */
     private void loadDeviceDetail() {
-        temperatureDeviceInfoMap = JsonUtils.getDevIdList(TEMPERATURE_DETAIL_PATH);
-        signalDeviceInfoMap = JsonUtils.getDevIdList(SIGNAL_DEVICES_PATH);
-        measureDeviceInfoMap = JsonUtils.getDevIdList(MEASURE_DETAIL_PATH);
-        hydrogenDeviceInfoMap = loadHydrogenDeviceInfoMap();
         zuanjingDeviceInfoMap = JsonUtils.getDevIdList(ZUANJING_DETAIL_PATH);
     }
 
