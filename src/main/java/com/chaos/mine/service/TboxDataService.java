@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.chaos.mine.entity.TBoxSignalConstant;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -32,6 +33,9 @@ public class TboxDataService {
     private int readTimeout;
     @Value("${tbox.tbox.init.delay}")
     private long tboxInitDelay;
+
+    @Autowired
+    private MessageSendService messageSendService;
 
     // 核心组件
     private SerialPort serialPort; // 串口对象
@@ -64,7 +68,7 @@ public class TboxDataService {
         if (!serialPort.openPort()) {
             throw new RuntimeException("串口初始化失败！端口[" + portName + "]被占用或参数错误");
         }
-        System.out.println("串口初始化成功：端口=" + portName + "，波特率=" + 115200);
+        log.info("串口初始化成功：端口={}，波特率={}", portName, 115200);
     }
 
 
@@ -96,8 +100,10 @@ public class TboxDataService {
             long currentTime = System.currentTimeMillis();
             if (currentTime - powerOnTime >= tboxInitDelay) {
                 isTboxReady = true;
-                System.out.println("TBOX初始化完成（耗时：" + tboxInitDelay / 1000 + "秒），开始解析JSON数据");
+                log.info("TBOX初始化完成（耗时：{}秒），开始解析JSON数据", tboxInitDelay / 1000);
             }
+        } else {
+            log.info("TBOX 不是可读状态");
         }
     }
 
@@ -124,7 +130,7 @@ public class TboxDataService {
     // 处理单帧数据（TBOX就绪后解析JSON，未就绪则丢弃）
     private void processSingleFrame(String oneFrame) {
         if (!isTboxReady) {
-            System.out.println("TBOX未就绪，丢弃数据：" + oneFrame);
+            log.info("TBOX未就绪，丢弃数据：{}", oneFrame);
             return;
         }
 
@@ -136,14 +142,15 @@ public class TboxDataService {
                 synchronized (signalMap) { // 加锁保证线程安全（避免接口读取时写入）
                     for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
                         signalMap.put(entry.getKey(), entry.getValue());
+                        messageSendService.sendMsg2Kafka(entry.getKey(), (double) entry.getValue());
                     }
                 }
-                System.out.println("解析成功，当前信号数：" + signalMap.size() + "，最新帧：" + oneFrame);
+                log.info("解析成功，当前信号数：{}，最新帧：{}", signalMap.size(), oneFrame);
             } catch (Exception e) {
-                System.err.println("JSON解析失败，无效数据：" + oneFrame + "，异常：" + e.getMessage());
+                log.error("JSON解析失败，无效数据：{}，异常：{}", oneFrame , e.getMessage());
             }
         } else {
-            System.err.println("非JSON格式数据，丢弃：" + oneFrame);
+            log.error("非JSON格式数据，丢弃：{}", oneFrame);
         }
     }
 

@@ -3,6 +3,7 @@ package com.chaos.mine.service;
 import com.chaos.mine.util.CRC16Util;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -19,6 +20,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @Slf4j
 @Service
 public class ModbusService {
+
+    @Autowired
+    private MessageSendService messageSendService;
+
     private final SerialPort serialPort;
     private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
     private final AtomicReference<Double> totalWeight = new AtomicReference<>(0.0);
@@ -38,7 +43,11 @@ public class ModbusService {
                 int val = ((resp1[3] & 0xFF) << 24) | ((resp1[4] & 0xFF) << 16)
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
                 singleWeight.set((double) val); // 单位是kg
+                log.info("Single weight: {}", (double) val);
+                messageSendService.sendMsg2Kafka("singleWeight", (double) val);
             }
+
+
 
             // 读累计重量 0x01 0x03 0x00 0x02 0x00 0x02 + CRC
             byte[] cmd2 = new byte[]{0x01, 0x03, 0x00, 0x02, 0x00, 0x02};
@@ -49,7 +58,10 @@ public class ModbusService {
                 int val = ((resp2[3] & 0xFF) << 24) | ((resp2[4] & 0xFF) << 16)
                         | ((resp2[5] & 0xFF) << 8) | (resp2[6] & 0xFF);
                 totalWeight.set((double) val);
+                log.info("Total weight: {}", (double) val);
+                messageSendService.sendMsg2Kafka("totalWeight", (double) val);
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
