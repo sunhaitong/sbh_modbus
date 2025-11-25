@@ -142,7 +142,7 @@ public class TboxDataService {
                 synchronized (signalMap) { // 加锁保证线程安全（避免接口读取时写入）
                     for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
                         signalMap.put(entry.getKey(), entry.getValue());
-                        messageSendService.sendMsg2Kafka(entry.getKey(), (double) entry.getValue());
+                        messageSendService.sendMsg2Kafka("01", entry.getKey(), (double) entry.getValue());
                     }
                 }
                 log.info("解析成功，当前信号数：{}，最新帧：{}", signalMap.size(), oneFrame);

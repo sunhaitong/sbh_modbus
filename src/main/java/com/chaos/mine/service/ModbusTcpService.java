@@ -76,7 +76,7 @@ public class ModbusTcpService {
                 Object value = readRegisterValue(address, type);
                 result.put("R" + address, value);
                 log.info("R" + address + "=" + value);
-                messageSendService.sendMsg2Kafka("R" + address, (double) value);
+                messageSendService.sendMsg2Kafka("03", "R" + address, (double) value);
             } catch (Exception e) {
                 result.put("R" + address, "ERR");
             }

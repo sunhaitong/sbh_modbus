@@ -44,7 +44,7 @@ public class ModbusService {
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
                 singleWeight.set((double) val); // 单位是kg
                 log.info("Single weight: {}", (double) val);
-                messageSendService.sendMsg2Kafka("singleWeight", (double) val);
+                messageSendService.sendMsg2Kafka("02","singleWeight", (double) val);
             }
 
 
@@ -59,7 +59,7 @@ public class ModbusService {
                         | ((resp2[5] & 0xFF) << 8) | (resp2[6] & 0xFF);
                 totalWeight.set((double) val);
                 log.info("Total weight: {}", (double) val);
-                messageSendService.sendMsg2Kafka("totalWeight", (double) val);
+                messageSendService.sendMsg2Kafka("02","totalWeight", (double) val);
             }
 
         } catch (Exception e) {

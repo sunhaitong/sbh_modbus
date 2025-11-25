@@ -28,11 +28,11 @@ public class MessageSendService {
     @Value("${kafka.topic}")
     private String kafkaTopic;
 
-    public void sendMsg2Kafka(String paramCode, Double value) {
+    public void sendMsg2Kafka(String pointNO, String paramCode, Double value) {
         try {
             DeviceDataVO deviceDataVO = new DeviceDataVO();
             deviceDataVO.setEquipNum(equipNo);
-            deviceDataVO.setPointNum(pointNo);
+            deviceDataVO.setPointNum(pointNO);
             deviceDataVO.setParamNum(paramCode);
             deviceDataVO.setValue(value);
             deviceDataVO.setSampleTime(System.currentTimeMillis());
