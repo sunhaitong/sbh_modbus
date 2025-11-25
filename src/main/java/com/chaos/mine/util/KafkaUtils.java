@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * kafka工具类
@@ -101,6 +102,20 @@ public class KafkaUtils {
         return producer.send(producerRecord);
     }
 
+    /** ★★★ 同步发送（最重要） */
+    public static void sendSync(String brokers, String topic, String msg) throws Exception {
+        KafkaProducer<String, String> producer = getProducer(brokers);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, msg);
+        // ★★★ 关键点：get() 会让网络异常立即抛出异常
+        producer.send(record).get(1, TimeUnit.SECONDS);
+    }
+
+    /** 同步发送带 key */
+    public static void sendSync(String brokers, String topic, String key, String msg) throws Exception {
+        KafkaProducer<String, String> producer = getProducer(brokers);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, msg);
+        producer.send(record).get(1, TimeUnit.SECONDS);
+    }
 
     /**
      * close method

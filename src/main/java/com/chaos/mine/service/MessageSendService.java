@@ -2,8 +2,10 @@ package com.chaos.mine.service;
 
 import com.alibaba.fastjson.JSON;
 import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.offline.DataService;
 import com.chaos.mine.util.KafkaUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +30,9 @@ public class MessageSendService {
     @Value("${kafka.topic}")
     private String kafkaTopic;
 
+    @Autowired
+    private DataService dataService;
+
     public void sendMsg2Kafka(String pointNO, String paramCode, Double value) {
         try {
             DeviceDataVO deviceDataVO = new DeviceDataVO();
@@ -38,7 +43,8 @@ public class MessageSendService {
             deviceDataVO.setSampleTime(System.currentTimeMillis());
             deviceDataVO.setRecvTime(System.currentTimeMillis());
             log.info("send msg to kafka data:{}", JSON.toJSONString(deviceDataVO));
-            KafkaUtils.send(kafkaHost, kafkaTopic, JSON.toJSONString(deviceDataVO));
+            dataService.sendMsg2Kafka(deviceDataVO);
+           // KafkaUtils.send(kafkaHost, kafkaTopic, JSON.toJSONString(deviceDataVO));
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
