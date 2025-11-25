@@ -2,6 +2,7 @@ package com.chaos.mine.offline;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -20,6 +21,9 @@ public class OfflineDataCleaner {
     @Autowired
     private OfflineMsgDao dao;
 
+    @Value("${offline.cache.day:1}")
+    private Long offlineCacheDay;
+
     @PostConstruct
     public void start() {
 
@@ -27,7 +31,7 @@ public class OfflineDataCleaner {
 
             while (true) {
                 try {
-                    long expire = System.currentTimeMillis() - 24 * 3600 * 1000L;
+                    long expire = System.currentTimeMillis() - offlineCacheDay * 24 * 3600 * 1000L;
                     int count = dao.deleteBefore(expire);
 
                     if (count > 0) {
