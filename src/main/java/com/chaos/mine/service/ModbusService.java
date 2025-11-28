@@ -6,9 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -32,6 +34,113 @@ public class ModbusService {
         this.serialPort = serialPort;
     }
 
+    private byte[] readModbusResponseDynamic(InputStream in) throws Exception {
+        ByteArrayOutputStream response = new ByteArrayOutputStream();
+        byte[] buffer = new byte[256];
+
+        long startTime = System.currentTimeMillis();
+        int timeout = 1000;
+        int frameTimeout = 50; // 帧间超时
+
+        long lastDataTime = System.currentTimeMillis();
+        boolean readingFrame = true;
+
+        while (readingFrame && System.currentTimeMillis() - startTime < timeout) {
+            if (in.available() > 0) {
+                int read = in.read(buffer);
+                if (read > 0) {
+                    response.write(buffer, 0, read);
+                    lastDataTime = System.currentTimeMillis();
+
+                    // 检查是否已收到完整帧
+                    byte[] currentData = response.toByteArray();
+                    if (isModbusFrameComplete(currentData)) {
+                        readingFrame = false;
+                    }
+                }
+            } else {
+                // 检查帧间超时
+                if (System.currentTimeMillis() - lastDataTime > frameTimeout) {
+                    if (response.size() > 0) {
+                        readingFrame = false; // 认为帧接收完成
+                    }
+                }
+            }
+            Thread.sleep(2);
+        }
+
+        if (response.size() == 0) {
+            throw new TimeoutException("Modbus响应超时");
+        }
+
+        byte[] fullResponse = response.toByteArray();
+
+        // 验证CRC
+        if (!verifyCRC(fullResponse)) {
+            throw new Exception("CRC校验失败");
+        }
+
+        return fullResponse;
+    }
+    private boolean isModbusFrameComplete(byte[] data) {
+        if (data.length < 2) return false;
+
+        byte functionCode = data[1];
+
+        switch (functionCode) {
+            case 0x03: // 读寄存器响应
+                if (data.length < 3) return false;
+                byte byteCount = data[2];
+                return data.length >= (3 + byteCount + 2); // 头3字节 + 数据 + CRC2
+
+            case 0x06: // 写寄存器响应
+                return data.length >= 8; // 固定8字节
+
+            default:
+                return data.length >= 4; // 最小帧长
+        }
+    }
+
+    private boolean verifyCRC(byte[] data) {
+        if (data.length < 2) return false;
+
+        int crc = 0xFFFF;
+        for (int i = 0; i < data.length - 2; i++) {
+            crc ^= (data[i] & 0xFF);
+            for (int j = 0; j < 8; j++) {
+                if ((crc & 0x0001) != 0) {
+                    crc = (crc >> 1) ^ 0xA001;
+                } else {
+                    crc = crc >> 1;
+                }
+            }
+        }
+
+        byte crcLow = (byte) (crc & 0xFF);
+        byte crcHigh = (byte) ((crc >> 8) & 0xFF);
+
+        return (data[data.length - 2] == crcLow && data[data.length - 1] == crcHigh);
+    }
+    /*private byte[] sendAndReceive(byte[] request) throws Exception {
+        try (OutputStream out = serialPort.getOutputStream();
+             InputStream in = serialPort.getInputStream()) {
+
+            out.write(request);
+            out.flush();
+
+            Thread.sleep(100);
+
+            byte[] buffer = new byte[64];
+            int len = in.read(buffer);
+            if (len > 0) {
+                byte[] resp = new byte[len];
+                System.arraycopy(buffer, 0, resp, 0, len);
+                return resp;
+            }
+            return null;
+        } // 自动
+    }*/
+
     public synchronized void readWeights() {
         try {
             // 读单铲重量 0x01 0x03 0x00 0x00 0x00 0x02 + CRC
@@ -42,9 +151,9 @@ public class ModbusService {
             if (resp1 != null && resp1.length >= 9) {
                 int val = ((resp1[3] & 0xFF) << 24) | ((resp1[4] & 0xFF) << 16)
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
-                singleWeight.set((double) val); // 单位是kg
-                log.info("Single weight: {}", (double) val);
-                messageSendService.sendMsg2Kafka("02","singleWeight", (double) val);
+                singleWeight.set((double) val / 1000); // 单位是kg
+                log.info("Single weight: {}", (double) val / 1000);
+                messageSendService.sendMsg2Kafka("02","singleWeight", (double) val / 1000);
             }
 
 
@@ -57,9 +166,9 @@ public class ModbusService {
             if (resp2 != null && resp2.length >= 9) {
                 int val = ((resp2[3] & 0xFF) << 24) | ((resp2[4] & 0xFF) << 16)
                         | ((resp2[5] & 0xFF) << 8) | (resp2[6] & 0xFF);
-                totalWeight.set((double) val);
-                log.info("Total weight: {}", (double) val);
-                messageSendService.sendMsg2Kafka("02","totalWeight", (double) val);
+                totalWeight.set((double) val / 1000);
+                log.info("Total weight: {}", (double) val / 1000 );
+                messageSendService.sendMsg2Kafka("02","totalWeight", (double) val / 1000);
             }
 
         } catch (Exception e) {
@@ -68,22 +177,22 @@ public class ModbusService {
     }
 
     private byte[] sendAndReceive(byte[] request) throws Exception {
-        OutputStream out = serialPort.getOutputStream();
-        InputStream in = serialPort.getInputStream();
-        out.write(request);
-        out.flush();
+        try (OutputStream out = serialPort.getOutputStream();
+             InputStream in = serialPort.getInputStream()) {
 
-        Thread.sleep(100); // 等待响应
+            // 清空输入缓冲区
+            while (in.available() > 0) {
+                in.read();
+            }
 
-        byte[] buffer = new byte[64];
-        int len = in.read(buffer);
-        if (len > 0) {
-            byte[] resp = new byte[len];
-            System.arraycopy(buffer, 0, resp, 0, len);
-            return resp;
+            // 发送请求
+            out.write(request);
+            out.flush();
+
+            return readModbusResponseDynamic(in);
         }
-        return null;
     }
+
 
     public double getSingleWeight() {
         return singleWeight.get();

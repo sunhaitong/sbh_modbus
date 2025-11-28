@@ -1,10 +1,13 @@
 package com.chaos.mine.service;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.chaos.mine.entity.TBoxSignalConstant;
+import com.chaos.mine.util.ServerIpUtil;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -139,10 +142,16 @@ public class TboxDataService {
             try {
                 // 解析JSON并更新信号存储（覆盖旧值，保持数据最新）
                 JSONObject jsonObject = JSON.parseObject(oneFrame);
-                synchronized (signalMap) { // 加锁保证线程安全（避免接口读取时写入）
-                    for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
-                        signalMap.put(entry.getKey(), entry.getValue());
-                        messageSendService.sendMsg2Kafka("01", entry.getKey(), (double) entry.getValue());
+                for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
+                    //signalMap.put(entry.getKey(), entry.getValue());
+                    signalMap.put(entry.getKey(), entry.getValue());
+                    if (entry.getKey().equals("DM1")) {
+                        JSONArray array = jsonObject.getJSONArray("DM1");
+                        for (int i = 0; i < array.size(); i++) {
+                            messageSendService.sendMsg2Kafka("01", entry.getKey()+ "_" + i, array.getDouble(i));
+                        }
+                    } else {
+                        messageSendService.sendMsg2Kafka("01", entry.getKey(), jsonObject.getDoubleValue(entry.getKey()));
                     }
                 }
                 log.info("解析成功，当前信号数：{}，最新帧：{}", signalMap.size(), oneFrame);
@@ -152,6 +161,13 @@ public class TboxDataService {
         } else {
             log.error("非JSON格式数据，丢弃：{}", oneFrame);
         }
+    }
+
+    public static void main(String[] args) {
+        String json = "{\"Eng_Oil_Press\":224,\"Eng_Cool_Temp\":75,\"Eng_In_Air_Temp\":28,\"Eng_Op_Hrs\":58.35,\"Eng_Spd\":850,\"DPF_Regen\":0,\"NOx_Out\":-1,\"NOx_In\":537.8,\"DEF_Level\":98.4,\"Fuel_Total\":403.5,\"Veh_Spd\":2.3,\"Trans_Oil_Press\":2.5,\"Trans_Oil_Temp\":35,\"Batt_Volt\":27.9,\"DM1\":[]}";
+
+        JSONObject jsonObject = JSON.parseObject(json);
+        Double test = jsonObject.getDouble("Eng_Oil_Press");
     }
 
     // 对外提供：获取所有信号值（供接口调用）

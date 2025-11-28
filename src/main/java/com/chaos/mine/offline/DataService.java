@@ -4,9 +4,11 @@ package com.chaos.mine.offline;
 
 import com.alibaba.fastjson.JSON;
 import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.runner.AsyncKafkaSender;
 import com.chaos.mine.util.KafkaUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -34,15 +36,21 @@ public class DataService {
     @Value("${kafka.topic}")
     private String kafkaTopic;
 
+    @Autowired
+    private AsyncKafkaSender asyncKafkaSender;
+
+
     public void sendMsg2Kafka(DeviceDataVO vo) {
         String json = JSON.toJSONString(vo);
-
-        try {
-            KafkaUtils.sendSync(kafkaHost, kafkaTopic, json);
-        } catch (Exception e) {
-            log.warn("Kafka unreachable, store to queue");
-            offlineQueue.offer(json);                       // ② Kafka 不可用 → 入队
-        }
+        asyncKafkaSender.sendAsync(kafkaHost, kafkaTopic,vo.getEquipNum(), json)
+                .thenAccept(success -> {
+                    if (!success) {
+                        log.warn("Kafka消息发送失败 - Equip: {}, Topic: {}", vo.getParamNum(), kafkaTopic);
+                    } else {
+                        log.warn("Kafka unreachable, store to queue");
+                        offlineQueue.offer(json);
+                    }
+                });
     }
 }
 
