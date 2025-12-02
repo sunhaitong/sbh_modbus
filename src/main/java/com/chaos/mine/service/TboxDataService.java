@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.chaos.mine.entity.TBoxSignalConstant;
+import com.chaos.mine.entity.VehicleData;
 import com.chaos.mine.util.ServerIpUtil;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -140,9 +142,36 @@ public class TboxDataService {
         // 协议规定JSON帧首尾为{}，先做基础校验
         if (oneFrame.startsWith("{") && oneFrame.endsWith("}")) {
             try {
+                VehicleData data = JSON.parseObject(oneFrame, VehicleData.class);
+                signalMap.put("Eng_Oil_Press", data.getEng_Oil_Press());
+                signalMap.put("Eng_Cool_Temp", data.getEng_Cool_Temp());
+                signalMap.put("Eng_In_Air_Temp", data.getEng_In_Air_Temp());
+                signalMap.put("Eng_Op_Hrs", data.getEng_Op_Hrs());
+                signalMap.put("Eng_Spd", data.getEng_Spd());
+                signalMap.put("DPF_Regen", data.getDPF_Regen());
+                signalMap.put("NOx_Out", data.getNOx_Out());
+                signalMap.put("NOx_In", data.getNOx_In());
+                signalMap.put("DEF_Level", data.getDEF_Level());
+                signalMap.put("Fuel_Total", data.getFuel_Total());
+                signalMap.put("Veh_Spd", data.getVeh_Spd());
+                signalMap.put("Trans_Oil_Press", data.getTrans_Oil_Press());
+                signalMap.put("Trans_Oil_Temp", data.getTrans_Oil_Temp());
+                signalMap.put("Batt_Volt", data.getBatt_Volt());
+                signalMap.put("DM1", data.getDM1());
+                signalMap.forEach((k, v) -> {
+                    if (k.equals("DM1")) {
+                        List<String> dms =  data.getDM1();
+                        for (int i = 0; i < dms.size(); i++) {
+                            messageSendService.sendMsg2Kafka("01", k+ "_" + i, (double) Long.parseLong(dms.get(i), 16));
+                        }
+                    } else {
+                        messageSendService.sendMsg2Kafka("01", k, (double) v);
+                    }
+                });
+
                 // 解析JSON并更新信号存储（覆盖旧值，保持数据最新）
-                JSONObject jsonObject = JSON.parseObject(oneFrame);
-                for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
+                /*JSONObject jsonObject = JSON.parseObject(oneFrame);*/
+                /*for (Map.Entry<String, Object> entry : jsonObject.entrySet()) {
                     //signalMap.put(entry.getKey(), entry.getValue());
                     signalMap.put(entry.getKey(), entry.getValue());
                     if (entry.getKey().equals("DM1")) {
@@ -153,7 +182,7 @@ public class TboxDataService {
                     } else {
                         messageSendService.sendMsg2Kafka("01", entry.getKey(), jsonObject.getDoubleValue(entry.getKey()));
                     }
-                }
+                }*/
                 log.info("解析成功，当前信号数：{}，最新帧：{}", signalMap.size(), oneFrame);
             } catch (Exception e) {
                 log.error("JSON解析失败，无效数据：{}，异常：{}", oneFrame , e.getMessage());
@@ -162,13 +191,13 @@ public class TboxDataService {
             log.error("非JSON格式数据，丢弃：{}", oneFrame);
         }
     }
-
+/*
     public static void main(String[] args) {
         String json = "{\"Eng_Oil_Press\":224,\"Eng_Cool_Temp\":75,\"Eng_In_Air_Temp\":28,\"Eng_Op_Hrs\":58.35,\"Eng_Spd\":850,\"DPF_Regen\":0,\"NOx_Out\":-1,\"NOx_In\":537.8,\"DEF_Level\":98.4,\"Fuel_Total\":403.5,\"Veh_Spd\":2.3,\"Trans_Oil_Press\":2.5,\"Trans_Oil_Temp\":35,\"Batt_Volt\":27.9,\"DM1\":[]}";
 
         JSONObject jsonObject = JSON.parseObject(json);
         Double test = jsonObject.getDouble("Eng_Oil_Press");
-    }
+    }*/
 
     // 对外提供：获取所有信号值（供接口调用）
     // -------------------------- 核心：返回全量信号（信号名作为Key，无中文） --------------------------
