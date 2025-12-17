@@ -134,10 +134,10 @@ public class TboxDataService {
 
     // 处理单帧数据（TBOX就绪后解析JSON，未就绪则丢弃）
     private void processSingleFrame(String oneFrame) {
-        if (!isTboxReady) {
+        /*if (!isTboxReady) {
             log.info("TBOX未就绪，丢弃数据：{}", oneFrame);
             return;
-        }
+        }*/
 
         // 协议规定JSON帧首尾为{}，先做基础校验
         if (oneFrame.startsWith("{") && oneFrame.endsWith("}")) {
@@ -165,7 +165,7 @@ public class TboxDataService {
                             messageSendService.sendMsg2Kafka("01", k+ "_" + i, (double) Long.parseLong(dms.get(i), 16));
                         }
                     } else {
-                        messageSendService.sendMsg2Kafka("01", k, (double) v);
+                        messageSendService.sendMsg2Kafka("01", k, (Double) v);
                     }
                 });
 

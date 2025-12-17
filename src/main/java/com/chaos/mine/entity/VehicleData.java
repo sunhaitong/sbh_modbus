@@ -13,19 +13,19 @@ import java.util.List;
 
 @Data
 public class VehicleData {
-    private int Eng_Oil_Press;
-    private int Eng_Cool_Temp;
-    private int Eng_In_Air_Temp;
+    private double Eng_Oil_Press;
+    private double Eng_Cool_Temp;
+    private double Eng_In_Air_Temp;
     private double Eng_Op_Hrs;
     private double Eng_Spd;
-    private int DPF_Regen;
-    private int NOx_Out;
-    private int NOx_In;
-    private int DEF_Level;
-    private int Fuel_Total;
-    private int Veh_Spd;
-    private int Trans_Oil_Press;
-    private int Trans_Oil_Temp;
+    private double DPF_Regen;
+    private double NOx_Out;
+    private double NOx_In;
+    private double DEF_Level;
+    private double Fuel_Total;
+    private double Veh_Spd;
+    private double Trans_Oil_Press;
+    private double Trans_Oil_Temp;
     private double Batt_Volt;
     private List<String> DM1;
 }
