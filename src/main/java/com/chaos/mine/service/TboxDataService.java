@@ -82,7 +82,7 @@ public class TboxDataService {
     @Async// 固定周期1000ms（1秒）执行一次
     public void readSerialDataPeriodically() {
         // 1. 先判断TBOX是否就绪（上电后超过初始化延时则就绪）
-        checkTboxReady();
+        // checkTboxReady();
 
         // 2. 读取串口数据（单次读取最大1KB，适配协议帧大小）
         byte[] readBuffer = new byte[1024];
