@@ -14,6 +14,7 @@ import com.serotonin.modbus4j.exception.ModbusInitException;
 import com.serotonin.modbus4j.exception.ModbusTransportException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,7 @@ public class ModbusRunner {
     private int count = 100;
     // 每天5分钟提取一次
     @Scheduled(cron = "0 1/5 * * * ?")
+    @Async
     public void temperatureHandle() throws ErrorResponseException, ModbusTransportException, ModbusInitException {
         // 转发温度传感器数据
         log.info("start to send temp data.....");
@@ -48,6 +50,7 @@ public class ModbusRunner {
 
     // 每天5分钟提取一次
     @Scheduled(cron = "0 1/5 * * * ?")
+    @Async
     public void hydrogenHandle() throws ErrorResponseException, ModbusTransportException, ModbusInitException {
         // 处理氢气
         String hydrogenHost = "192.169.1.224";
@@ -63,6 +66,7 @@ public class ModbusRunner {
 
     // 每天5分钟提取一次 遥测
     @Scheduled(cron = "0 1/5 * * * ?")
+    @Async
     public void measureHandle() throws ErrorResponseException, ModbusTransportException, ModbusInitException {
         // 处理遥测
         String host = "192.169.1.223";

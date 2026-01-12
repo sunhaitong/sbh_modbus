@@ -4,6 +4,7 @@ import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
@@ -68,7 +69,8 @@ public class SerialReader {
     /**
      * 定时读取串口数据（每3秒执行一次）
      */
-    @Scheduled(fixedDelay = 3000)
+    @Scheduled(fixedDelay = 1000)
+    @Async
     public void readSerialData() {
         if (comPort == null || !comPort.isOpen()) {
             log.error("串口未打开，跳过本次读取");
