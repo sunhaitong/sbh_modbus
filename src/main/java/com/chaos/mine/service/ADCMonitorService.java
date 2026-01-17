@@ -23,8 +23,8 @@ public class ADCMonitorService {
     /**
      * 每秒执行一次的定时任务
      */
-    @Scheduled(fixedRate = 10000)
-    @Async// 1000毫秒 = 1秒
+    /*@Scheduled(fixedRate = 10000)
+    @Async*/// 1000毫秒 = 1秒
     public void monitorADC() {
         try {
             // 读取ADC原始值

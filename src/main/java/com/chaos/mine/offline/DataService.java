@@ -42,15 +42,14 @@ public class DataService {
 
     public void sendMsg2Kafka(DeviceDataVO vo) {
         String json = JSON.toJSONString(vo);
-        asyncKafkaSender.sendAsync(kafkaHost, kafkaTopic,vo.getEquipNum(), json)
-                .thenAccept(success -> {
-                    if (!success) {
-                        log.warn("Kafka消息发送失败 - Equip: {}, Topic: {}", vo.getParamNum(), kafkaTopic);
-                    } else {
-                        log.warn("Kafka unreachable, store to queue");
-                        offlineQueue.offer(json);
-                    }
-                });
+        String key = vo.getEquipNum();
+        boolean res = asyncKafkaSender.sendWithTimeout(kafkaHost, kafkaTopic, key, json);
+        if (!res) {
+            boolean offerSuccess = offlineQueue.offer(json);
+            if (!offerSuccess) {
+                log.error("离线队列已满，消息丢失: {}", json.substring(0, Math.min(json.length(), 100)));
+            }
+        }
     }
 }
 

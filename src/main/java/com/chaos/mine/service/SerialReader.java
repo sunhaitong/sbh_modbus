@@ -69,8 +69,8 @@ public class SerialReader {
     /**
      * 定时读取串口数据（每3秒执行一次）
      */
-    @Scheduled(fixedDelay = 1000)
-    @Async
+    /*@Scheduled(fixedDelay = 1000)
+    @Async*/
     public void readSerialData() {
         if (comPort == null || !comPort.isOpen()) {
             log.error("串口未打开，跳过本次读取");

@@ -2,6 +2,7 @@ package com.chaos.mine.runner;
 
 import com.chaos.mine.util.KafkaUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.*;
@@ -28,27 +29,26 @@ public class AsyncKafkaSender {
         }, kafkaExecutor);
     }
 
-    private boolean sendWithTimeout(String kafkaHost, String topic, String key, String message) {
-        CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
-            try {
-                KafkaUtils.send(kafkaHost, topic, key, message);
-                return true;
-            } catch (Exception e) {
-                log.error("Kafka发送失败 - Host: {}, Topic: {}, Error: {}", kafkaHost, topic, e.getMessage());
-                return false;
-            }
-        });
-
+    public boolean sendWithTimeout(String kafkaHost, String topic, String key, String message) {
+        Future<RecordMetadata> future = null;
         try {
-            // 设置5秒超时
-            return future.get(5, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            log.warn("Kafka发送超时 - Host: {}, Topic: {}", kafkaHost, topic);
-            future.cancel(true); // 取消任务
+            future = KafkaUtils.send(kafkaHost, topic, key, message);
+
+            // 设置2秒超时
+            RecordMetadata metadata = future.get(2, TimeUnit.SECONDS);
+
+            // 验证发送结果
+            if (metadata != null) {
+                log.debug("发送成功 - Partition: {}, Offset: {}",
+                        metadata.partition(), metadata.offset());
+                return true;
+            }
             return false;
-        } catch (Exception e) {
-            log.error("Kafka发送异常", e);
+
+        } catch (TimeoutException | InterruptedException | ExecutionException e) {
+            log.warn("Kafka发送超时（5秒）");
             return false;
+
         }
     }
 }

@@ -29,7 +29,7 @@ import java.util.Map;
 //@Component
 @Slf4j
 public class ModbusRunner {
-    private int count = 100;
+    /*private int count = 100;
     // 每天5分钟提取一次
     @Scheduled(cron = "0 1/5 * * * ?")
     @Async
@@ -111,13 +111,13 @@ public class ModbusRunner {
                             } else {
                                 data.setValue(value);
                             }
-                            /*if (deviceInfo.getKpIid().endsWith("电压") || convertList.contains(deviceInfo.getKpIid())) {
+                            *//*if (deviceInfo.getKpIid().endsWith("电压") || convertList.contains(deviceInfo.getKpIid())) {
                                 data.setValue(value * 0.001);
                             } else if (deviceInfo.getKpIid().equals("频率")) {
                                 data.setValue(value * 0.014652);
                             } else {
                                 data.setValue(value);
-                            }*/
+                            }*//*
                         } else {
                             data.setValue(value);
                         }
@@ -140,7 +140,7 @@ public class ModbusRunner {
         }
     }
 
-    /**
+    *//**
      * 读取开关量
      * @param host
      * @param slaveId
@@ -148,7 +148,7 @@ public class ModbusRunner {
      * @throws ErrorResponseException
      * @throws ModbusTransportException
      * @throws ModbusInitException
-     */
+     *//*
     private void doSendCoilStatus(String host, int slaveId, int offset, DeviceInfo deviceInfo) throws ErrorResponseException, ModbusTransportException, ModbusInitException {
         Boolean res = ModbusUtils.readCoilStatus(slaveId, offset, host);
         if (null == deviceInfo) {
@@ -173,7 +173,7 @@ public class ModbusRunner {
     }
 
 
-    /**
+    *//**
      * 读取氢气
      * @param host
      * @param slaveId
@@ -181,7 +181,7 @@ public class ModbusRunner {
      * @throws ErrorResponseException
      * @throws ModbusTransportException
      * @throws ModbusInitException
-     */
+     *//*
     private void doSendHydrogen(String host, int slaveId, int offset, DeviceInfo deviceInfo) throws ErrorResponseException, ModbusTransportException, ModbusInitException {
         Number res = ModbusUtils.readHoldingRegister(host, slaveId, offset, DataType.TWO_BYTE_INT_SIGNED);
         if (null == deviceInfo) {
@@ -207,11 +207,11 @@ public class ModbusRunner {
 
 
 
-    /**
+    *//**
      * 获取读取寄存器list
      * @param total
      * @return
-     */
+     *//*
     private List<ReadOffset> getReadOffset(int total) {
         List<ReadOffset> offsets = new ArrayList<>();
         for (int i = 0; i <= total; i++) {
@@ -223,5 +223,5 @@ public class ModbusRunner {
             offsets.add(new ReadOffset((total / count) * 100, (total / count) * 100 + total % 100));
         }
         return offsets;
-    }
+    }*/
 }

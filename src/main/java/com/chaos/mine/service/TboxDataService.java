@@ -78,8 +78,8 @@ public class TboxDataService {
 
 
     // -------------------------- 核心：@Scheduled每秒读取串口数据 --------------------------
-    @Scheduled(fixedRate = 1000)
-    @Async// 固定周期1000ms（1秒）执行一次
+    /*@Scheduled(fixedRate = 1000)
+    @Async*/// 固定周期1000ms（1秒）执行一次
     public void readSerialDataPeriodically() {
         // 1. 先判断TBOX是否就绪（上电后超过初始化延时则就绪）
         // checkTboxReady();

@@ -1,10 +1,7 @@
 package com.chaos.mine.util;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.stereotype.Component;
 
@@ -41,6 +38,10 @@ public class KafkaUtils {
         // prop.put(ProducerConfig.ACKS_CONFIG, "-1");
         prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        // 设置连接超时
+        prop.put(ProducerConfig.MAX_BLOCK_MS_CONFIG,2000);
+        prop.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG,2000);
+        prop.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG,5000);
         return new KafkaProducer<>(prop);
     }
 
@@ -85,7 +86,20 @@ public class KafkaUtils {
     public static Future<RecordMetadata> send(String brokers, String topic, String key, String message) {
         KafkaProducer<String, String> producer = getProducer(brokers);
         ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(topic, key, message);
-        return producer.send(producerRecord);
+        return producer.send(producerRecord, new Callback() {
+            @Override
+            public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+                if ( e != null){
+                    log.error("kafka send message error:", e);
+                    producer.close();
+                    producerCache.remove(brokers);
+                }else {
+                    log.info("kafka send message success,topic: {},offset:{}",
+                            recordMetadata.topic(),
+                            recordMetadata.offset());
+                }
+            }
+        });
     }
 
 

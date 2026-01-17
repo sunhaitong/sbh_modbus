@@ -28,8 +28,8 @@ public class HeartService {
     /**
      * 每秒执行一次的定时任务
      */
-    @Scheduled(fixedRate = 1000)
-    @Async// 1000毫秒 = 1秒
+   /* @Scheduled(fixedRate = 1000)
+    @Async*/// 1000毫秒 = 1秒
     public void heartBeat() {
         try {
 
