@@ -1,16 +1,26 @@
 package com.chaos.mine.service;
 
+import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.CRC16Util;
+import com.chaos.mine.util.MineCartWeighTool;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -26,9 +36,15 @@ public class ModbusService {
     @Autowired
     private MessageSendService messageSendService;
 
+    @Value("${equip.no:test}")
+    private String equipNo;
+
     private final SerialPort serialPort;
     private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
     private final AtomicReference<Double> totalWeight = new AtomicReference<>(0.0);
+
+    private final AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+    private final AtomicLong  atomicLong = new AtomicLong(0L);
 
     public ModbusService(SerialPort serialPort) {
         this.serialPort = serialPort;
@@ -148,12 +164,36 @@ public class ModbusService {
             byte[] crc1 = CRC16Util.getCRC(cmd1);
             byte[] request1 = ByteBuffer.allocate(cmd1.length + 2).put(cmd1).put(crc1).array();
             byte[] resp1 = sendAndReceive(request1);
+            List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
+
+            boolean sendFlag = false;
             if (resp1 != null && resp1.length >= 9) {
                 int val = ((resp1[3] & 0xFF) << 24) | ((resp1[4] & 0xFF) << 16)
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
+                if ((double) val / 1000 < 2) {
+                    log.info("weight < 2 send:{}", val);
+                    if (atomicBoolean.get()) {
+                        log.info("Single weight: {}", (double) val / 1000);
+                        // messageSendService.sendMsg2Kafka("02","singleWeight", (double) val / 1000);
+                        DeviceDataVO single = new DeviceDataVO();
+                        single.setEquipNum(equipNo);
+                        single.setPointNum("02");
+                        single.setParamNum("singleWeight");
+                        single.setValue(MineCartWeighTool.calculateRealWeight(equipNo));
+                        single.setSampleTime(System.currentTimeMillis());
+                        single.setRecvTime(System.currentTimeMillis());
+                        deviceDataVOS.add(single);
+                        sendFlag = true;
+                    } else {
+                        log.info("kong zai....");
+                    }
+                } {
+                    MineCartWeighTool.processWeight(equipNo, (double) val / 1000);
+                    atomicBoolean.set(true);
+                    atomicLong.set(System.currentTimeMillis());
+                }
                 singleWeight.set((double) val / 1000); // 单位是kg
-                log.info("Single weight: {}", (double) val / 1000);
-                messageSendService.sendMsg2Kafka("02","singleWeight", (double) val / 1000);
+
             }
 
 
@@ -168,7 +208,22 @@ public class ModbusService {
                         | ((resp2[5] & 0xFF) << 8) | (resp2[6] & 0xFF);
                 totalWeight.set((double) val / 1000);
                 log.info("Total weight: {}", (double) val / 1000 );
-                messageSendService.sendMsg2Kafka("02","totalWeight", (double) val / 1000);
+                // messageSendService.sendMsg2Kafka("02","totalWeight", (double) val / 1000);
+                DeviceDataVO totalWeight = new DeviceDataVO();
+                totalWeight.setEquipNum(equipNo);
+                totalWeight.setPointNum("02");
+                totalWeight.setParamNum("totalWeight");
+                totalWeight.setValue((double) val / 1000);
+                totalWeight.setSampleTime(System.currentTimeMillis());
+                totalWeight.setRecvTime(atomicLong.get());
+                deviceDataVOS.add(totalWeight);
+            }
+
+
+            if (sendFlag && DataConfigManager.getInstance().isSampleFlag()) {
+                messageSendService.batchSendMsg2Kafka("weight", deviceDataVOS);
+                atomicBoolean.set(false);
+                atomicLong.set(0L);
             }
 
         } catch (Exception e) {

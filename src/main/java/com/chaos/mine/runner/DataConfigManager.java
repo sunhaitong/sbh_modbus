@@ -44,6 +44,16 @@ public class DataConfigManager {
      */
     private Map<Integer, DeviceInfo> temperatureDeviceInfoMap = new HashMap<>();
 
+    public boolean isSampleFlag() {
+        return sampleFlag;
+    }
+
+    public void setSampleFlag(boolean sampleFlag) {
+        this.sampleFlag = sampleFlag;
+    }
+
+    private volatile boolean sampleFlag = false;
+
     /**
      * 氢气
      */

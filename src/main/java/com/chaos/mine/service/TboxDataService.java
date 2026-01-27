@@ -3,11 +3,15 @@ package com.chaos.mine.service;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.chaos.mine.entity.DeviceDataVO;
 import com.chaos.mine.entity.TBoxSignalConstant;
 import com.chaos.mine.entity.VehicleData;
+import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.ServerIpUtil;
 import com.fazecast.jSerialComm.SerialPort;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +43,9 @@ public class TboxDataService {
     private int readTimeout;
     @Value("${tbox.tbox.init.delay}")
     private long tboxInitDelay;
+
+    @Value("${equip.no:test}")
+    private String equipNo;
 
     @Autowired
     private MessageSendService messageSendService;
@@ -148,6 +156,12 @@ public class TboxDataService {
                 signalMap.put("Eng_In_Air_Temp", data.getEng_In_Air_Temp());
                 signalMap.put("Eng_Op_Hrs", data.getEng_Op_Hrs());
                 signalMap.put("Eng_Spd", data.getEng_Spd());
+                if (data.getEng_Spd() > 200) {
+                    // 表示汽车运行
+                    DataConfigManager.getInstance().setSampleFlag(true);
+                } else {
+                    DataConfigManager.getInstance().setSampleFlag(false);
+                }
                 signalMap.put("DPF_Regen", data.getDPF_Regen());
                 signalMap.put("NOx_Out", data.getNOx_Out());
                 signalMap.put("NOx_In", data.getNOx_In());
@@ -158,14 +172,37 @@ public class TboxDataService {
                 signalMap.put("Trans_Oil_Temp", data.getTrans_Oil_Temp());
                 signalMap.put("Batt_Volt", data.getBatt_Volt());
                 signalMap.put("DM1", data.getDM1());
+
+                List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
                 signalMap.forEach((k, v) -> {
+
                     if (k.equals("DM1")) {
                         List<String> dms =  data.getDM1();
                         for (int i = 0; i < dms.size(); i++) {
-                            messageSendService.sendMsg2Kafka("01", k+ "_" + i, (double) Long.parseLong(dms.get(i), 16));
+                            DeviceDataVO deviceDataVO = new DeviceDataVO();
+                            deviceDataVO.setEquipNum(equipNo);
+                            deviceDataVO.setPointNum("01");
+                            deviceDataVO.setParamNum(k+ "_" + i);
+                            deviceDataVO.setValue((double) Long.parseLong(dms.get(i), 16));
+                            deviceDataVO.setSampleTime(System.currentTimeMillis());
+                            deviceDataVO.setRecvTime(System.currentTimeMillis());
+                            deviceDataVOS.add(deviceDataVO);
+                            //messageSendService.sendMsg2Kafka("01", k+ "_" + i, (double) Long.parseLong(dms.get(i), 16));
                         }
                     } else {
-                        messageSendService.sendMsg2Kafka("01", k, (Double) v);
+                        DeviceDataVO deviceDataVO = new DeviceDataVO();
+                        deviceDataVO.setEquipNum(equipNo);
+                        deviceDataVO.setPointNum("01");
+                        deviceDataVO.setParamNum(k);
+                        deviceDataVO.setValue((Double) v);
+                        deviceDataVO.setSampleTime(System.currentTimeMillis());
+                        deviceDataVO.setRecvTime(System.currentTimeMillis());
+                        deviceDataVOS.add(deviceDataVO);
+                        //log.info("send msg to kafka data:{}", JSON.toJSONString(deviceDataVO));
+                        //messageSendService.sendMsg2Kafka("01", k, (Double) v);
+                    }
+                    if (DataConfigManager.getInstance().isSampleFlag()) {
+                        messageSendService.batchSendMsg2Kafka("tbox", deviceDataVOS);
                     }
                 });
 

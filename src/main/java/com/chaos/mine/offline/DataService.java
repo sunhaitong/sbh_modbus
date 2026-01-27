@@ -51,5 +51,18 @@ public class DataService {
             }
         }
     }
+
+    public void batchSendMsg2Kafka(boolean cacheFlag, String topic, String key, String msg) {
+        if (topic == null || topic.isEmpty()) {
+            topic = kafkaTopic;
+        }
+        boolean res = asyncKafkaSender.sendWithTimeout(kafkaHost, topic, key, msg);
+        if (cacheFlag && !res) {
+            boolean offerSuccess = offlineQueue.offer(msg);
+            if (!offerSuccess) {
+                log.error("离线队列已满，消息丢失: {}");
+            }
+        }
+    }
 }
 

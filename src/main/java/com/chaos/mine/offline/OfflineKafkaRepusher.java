@@ -39,8 +39,7 @@ public class OfflineKafkaRepusher {
 
             while (true) {
                 try {
-                    List<OfflineMsg> msgs = dao.queryOldest(200);
-
+                    List<OfflineMsg> msgs = dao.queryOldest(2000);
                     for (OfflineMsg m : msgs) {
 
                         try {
@@ -53,7 +52,7 @@ public class OfflineKafkaRepusher {
                         }
                     }
 
-                    Thread.sleep(3000);
+                    Thread.sleep(1000);
 
                 } catch (Exception e) {
                     log.error("Resend loop error", e);

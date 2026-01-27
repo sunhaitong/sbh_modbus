@@ -1,5 +1,7 @@
 package com.chaos.mine.service;
 
+import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.runner.DataConfigManager;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +12,11 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -27,6 +32,11 @@ public class SerialReader {
 
     @Autowired
     private MessageSendService messageSendService;
+
+    private ConcurrentHashMap<String, Integer> cache = new ConcurrentHashMap<>();
+
+    @Value("${equip.no:test}")
+    private String equipNo;
 
     /**
      * 初始化串口（应用启动时执行）
@@ -72,6 +82,7 @@ public class SerialReader {
     /*@Scheduled(fixedDelay = 1000)
     @Async*/
     public void readSerialData() {
+        cache.clear();
         if (comPort == null || !comPort.isOpen()) {
             log.error("串口未打开，跳过本次读取");
             return;
@@ -150,7 +161,23 @@ public class SerialReader {
 
         // 解析为16位整数
         int value = ((data[0] & 0xFF) << 8) | (data[1] & 0xFF);
-        messageSendService.sendMsg2Kafka("01", "rfid", (double)value);
+        // messageSendService.sendMsg2Kafka("01", "rfid", (double)value);
+        List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
+        DeviceDataVO rfid = new DeviceDataVO();
+        rfid.setEquipNum(equipNo);
+        rfid.setPointNum("01");
+        rfid.setParamNum("rfid");
+        rfid.setValue((double)value);
+        rfid.setSampleTime(System.currentTimeMillis());
+        rfid.setRecvTime(System.currentTimeMillis());
+        deviceDataVOS.add(rfid);
+
+        if (DataConfigManager.getInstance().isSampleFlag()) {
+            String key = equipNo + "01" + value;
+            if (cache.get(key) != null) {
+                messageSendService.batchSendMsg2Kafka("rfid", deviceDataVOS);
+            }
+        }
     }
 
     /**

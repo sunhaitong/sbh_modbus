@@ -1,4 +1,7 @@
 package com.chaos.mine.service;
+import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.runner.DataConfigManager;
+import com.chaos.mine.util.MineCartWeighTool;
 import com.fazecast.jSerialComm.SerialPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +18,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
@@ -23,6 +31,13 @@ public class RS485WeightMonitor {
 
     @Autowired
     private MessageSendService messageSendService;
+
+    private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
+    private final AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+    private final AtomicLong atomicLong = new AtomicLong(0L);
+
+    @Value("${equip.no:test}")
+    private String equipNo;
 
     // ===================== 串口对象 =====================
     private final SerialPort serialPort;
@@ -175,7 +190,6 @@ public class RS485WeightMonitor {
             log.error("CRC 校验失败");
             return;
         }
-
         // ===== 关键修正点 =====
         // 有符号 32 位整数（补码）
         ByteBuffer buffer = ByteBuffer.wrap(Arrays.copyOfRange(frame, 7, 11));
@@ -183,8 +197,37 @@ public class RS485WeightMonitor {
         int weightKg = buffer.getInt();
 
         double weightT = Math.round(weightKg / 1000.0 * 1000.0) / 1000.0;
-        messageSendService.sendMsg2Kafka("kaugnche", "kaungche_weight", weightT);
-        
+        List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
+        boolean sendFlag = false;
+        if (weightT < 2) {
+            log.info("weight < 2 send:{}", weightT);
+            if (atomicBoolean.get()) {
+                log.info("Single weight: {}", weightT);
+                DeviceDataVO kaugnche = new DeviceDataVO();
+                kaugnche.setEquipNum(equipNo);
+                kaugnche.setPointNum("kaugnche");
+                kaugnche.setParamNum("kaungche_weight");
+                kaugnche.setValue(MineCartWeighTool.calculateRealWeight(equipNo));
+                kaugnche.setSampleTime(System.currentTimeMillis());
+                kaugnche.setRecvTime(atomicLong.get());
+                deviceDataVOS.add(kaugnche);
+                sendFlag = true;
+            } else {
+                log.info("kong zai....");
+            }
+        } {
+            MineCartWeighTool.processWeight(equipNo, weightT);
+            atomicBoolean.set(true);
+            atomicLong.set(System.currentTimeMillis());
+        }
+        singleWeight.set(weightT); // 单位是kg
+
+        if (sendFlag && DataConfigManager.getInstance().isSampleFlag()) {
+            messageSendService.batchSendMsg2Kafka("kaugnche", deviceDataVOS);
+            atomicBoolean.set(false);
+            atomicLong.set(0L);
+        }
+
         log.info(String.format("解析结果：%d kg  |  %.3f t", weightKg, weightT));
     }
 

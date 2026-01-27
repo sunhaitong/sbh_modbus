@@ -39,6 +39,9 @@ public class ModbusTcpService {
     @Value("${modbustcp.port:502}")
     private int port;
 
+    @Value("${equip.no:test}")
+    private String equipNo;
+
     @Autowired
     private MessageSendService messageSendService;
 
@@ -69,6 +72,7 @@ public class ModbusTcpService {
         if (master == null || hydrogenDevInfoMap == null || hydrogenDevInfoMap.isEmpty()) return;
 
         Map<String, Object> result = new LinkedHashMap<>();
+        List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
         for (Map.Entry<Integer, DeviceInfo> entry : hydrogenDevInfoMap.entrySet()) {
             int address = entry.getKey();
             String type = entry.getValue().getType().toLowerCase(Locale.ROOT);
@@ -76,7 +80,20 @@ public class ModbusTcpService {
                 Object value = readRegisterValue(address, type);
                 result.put("R" + address, value);
                 log.info("R" + address + "=" + value);
-                messageSendService.sendMsg2Kafka("03", "R" + address, (double) value);
+                // messageSendService.sendMsg2Kafka("03", "R" + address, (double) value);
+
+                DeviceDataVO deviceDataVO = new DeviceDataVO();
+                deviceDataVO.setEquipNum(equipNo);
+                deviceDataVO.setPointNum("03");
+                deviceDataVO.setParamNum("R" + address);
+                deviceDataVO.setValue((double) value);
+                deviceDataVO.setSampleTime(System.currentTimeMillis());
+                deviceDataVO.setRecvTime(System.currentTimeMillis());
+                deviceDataVOS.add(deviceDataVO);
+
+                if (DataConfigManager.getInstance().isSampleFlag()) {
+                    messageSendService.batchSendMsg2Kafka("modbusTcp", deviceDataVOS);
+                }
             } catch (Exception e) {
                 result.put("R" + address, "ERR");
             }
