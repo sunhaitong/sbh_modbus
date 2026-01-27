@@ -187,7 +187,8 @@ public class ModbusService {
                     } else {
                         log.info("kong zai....");
                     }
-                } {
+                } else {
+                    log.info("current weight: {}", (double) val / 1000);
                     MineCartWeighTool.processWeight(equipNo, (double) val / 1000);
                     atomicBoolean.set(true);
                     atomicLong.set(System.currentTimeMillis());

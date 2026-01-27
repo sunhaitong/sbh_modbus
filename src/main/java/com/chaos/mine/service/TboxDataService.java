@@ -201,10 +201,10 @@ public class TboxDataService {
                         //log.info("send msg to kafka data:{}", JSON.toJSONString(deviceDataVO));
                         //messageSendService.sendMsg2Kafka("01", k, (Double) v);
                     }
-                    if (DataConfigManager.getInstance().isSampleFlag()) {
-                        messageSendService.batchSendMsg2Kafka("tbox", deviceDataVOS);
-                    }
                 });
+                if (DataConfigManager.getInstance().isSampleFlag()) {
+                    messageSendService.batchSendMsg2Kafka("tbox", deviceDataVOS);
+                }
 
                 // 解析JSON并更新信号存储（覆盖旧值，保持数据最新）
                 /*JSONObject jsonObject = JSON.parseObject(oneFrame);*/

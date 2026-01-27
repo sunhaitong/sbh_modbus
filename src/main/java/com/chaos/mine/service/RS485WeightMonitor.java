@@ -215,13 +215,18 @@ public class RS485WeightMonitor {
             } else {
                 log.info("kong zai....");
             }
-        } {
+        } else {
+            log.info("current weight: {}", weightT);
             MineCartWeighTool.processWeight(equipNo, weightT);
             atomicBoolean.set(true);
             atomicLong.set(System.currentTimeMillis());
         }
         singleWeight.set(weightT); // 单位是kg
 
+        log.info("sendFlag:{} sampleFlag:{}, atomicBoolean：{}",
+                sendFlag,
+                DataConfigManager.getInstance().isSampleFlag(),
+                atomicBoolean.get());
         if (sendFlag && DataConfigManager.getInstance().isSampleFlag()) {
             messageSendService.batchSendMsg2Kafka("kaugnche", deviceDataVOS);
             atomicBoolean.set(false);

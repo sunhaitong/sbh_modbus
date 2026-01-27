@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 /**
  * @ClassName sunht
  * @Description TODO
@@ -34,6 +36,11 @@ public class ScheduleTask {
 
     @Autowired
     private HeartService heartService;
+
+    @Autowired
+    private CanWeightReader canWeightReader;
+
+
 
     @Autowired
     private RS485WeightMonitor rs485WeightMonitor;
@@ -68,7 +75,11 @@ public class ScheduleTask {
                 rs485WeightMonitor.readSerialData();
             }else if (kaungcheFlag == 3) {
                 log.info("安百拓矿卡 readWeights");
+                canWeightReader.getLatestWeightTons();
+
             }
+
+
 
         }).start();
     }
