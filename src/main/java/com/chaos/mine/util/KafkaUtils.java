@@ -38,10 +38,12 @@ public class KafkaUtils {
         // prop.put(ProducerConfig.ACKS_CONFIG, "-1");
         prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        // 设置连接超时
-        prop.put(ProducerConfig.MAX_BLOCK_MS_CONFIG,2000);
-        prop.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG,2000);
-        prop.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG,5000);
+        // 核心：快速失败
+        prop.put(ProducerConfig.RETRIES_CONFIG, 0);
+        prop.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 300);
+        prop.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 300);
+        prop.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 500);
+        prop.put(ProducerConfig.ACKS_CONFIG, "1");
         return new KafkaProducer<>(prop);
     }
 
@@ -74,15 +76,15 @@ public class KafkaUtils {
 
 
     }
-
-    /**
+/*
+    *//**
      * 发送消息带key
      *
      * @param topic
      * @param key
      * @param message
      * @return
-     */
+     *//*
     public static Future<RecordMetadata> send(String brokers, String topic, String key, String message) {
         KafkaProducer<String, String> producer = getProducer(brokers);
         ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(topic, key, message);
@@ -100,21 +102,39 @@ public class KafkaUtils {
                 }
             }
         });
-    }
+    }*/
 
 
     /**
+     * 发送消息
+     *
+     * @return true=发送成功（leader已确认），false=网络不通/发送失败
+     */
+    public static boolean send(String brokers, String topic, String key, String message) {
+        try {
+            KafkaProducer<String, String> producer = getProducer(brokers);
+            ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(topic, message);
+            // 同步等待结果，设置超时时间
+            producer.send(producerRecord).get(500, TimeUnit.MILLISECONDS);
+            return true;
+        } catch (Exception e) {
+            // 网络不通、broker不可达、超时，都会走这里
+            return false;
+        }
+    }
+/*
+    *//**
      * 发送消息，不带参数key的
      *
      * @param topic
      * @param message
      * @return
-     */
+     *//*
     public static Future<RecordMetadata> send(String brokers, String topic, String message) {
         KafkaProducer<String, String> producer = getProducer(brokers);
         ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(topic, message);
         return producer.send(producerRecord);
-    }
+    }*/
 
     /** ★★★ 同步发送（最重要） */
     public static void sendSync(String brokers, String topic, String msg) throws Exception {

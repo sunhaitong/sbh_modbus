@@ -1,4 +1,5 @@
 package com.chaos.mine.service;
+
 import com.chaos.mine.entity.DeviceDataVO;
 import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.MineCartWeighTool;
@@ -8,16 +9,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PreDestroy;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
+@EnableScheduling
 public class RS485WeightMonitor {
 
     @Autowired
@@ -39,53 +39,110 @@ public class RS485WeightMonitor {
     @Value("${equip.no:test}")
     private String equipNo;
 
+    @Value("${scale.serial.portName:COM1}")
+    private String portName;
+
     // ===================== 串口对象 =====================
-    private final SerialPort serialPort;
+    private SerialPort serialPort;
     private InputStream inputStream;
     private byte[] buffer = new byte[0];
     private int readCount = 0;
+    private boolean initialized = false;
 
-    // ===================== 构造函数注入 =====================
-    public RS485WeightMonitor(SerialPort serialPort) {
-        this.serialPort = serialPort;
-        initializeInputStream();
+    // ===================== 帧头定义 =====================
+    private static final byte[] EXPECTED_HEADER = new byte[] {
+            (byte) 0x02, (byte) 0x10, (byte) 0x00, (byte) 0x00,
+            (byte) 0x00, (byte) 0x03, (byte) 0x06
+    };
+
+    // ===================== 构造函数 =====================
+    public RS485WeightMonitor() {
+        // 构造函数中不再注入SerialPort
     }
 
-    // ===================== 初始化输入流 =====================
-    private void initializeInputStream() {
-        try {
-            if (serialPort != null && serialPort.isOpen()) {
-                // 设置读取超时
-                serialPort.setComPortTimeouts(
-                        SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
-                        100,  // 读取超时100ms，避免阻塞太久
-                        0     // 写入超时0秒
-                );
+    // ===================== 初始化串口 =====================
+    private synchronized boolean initializeSerialPort() {
+        if (initialized) {
+            return true;
+        }
 
-                inputStream = serialPort.getInputStream();
-                log.info("串口输入流初始化成功: " + serialPort.getSystemPortName());
-            } else {
-                log.error("串口未打开或为空");
+        try {
+            log.info("正在初始化串口: {}", portName);
+            serialPort = SerialPort.getCommPort(portName);
+
+            if (serialPort == null) {
+                log.error("串口 {} 不存在", portName);
+                return false;
             }
+
+            // 如果串口已打开，先关闭
+            if (serialPort.isOpen()) {
+                serialPort.closePort();
+            }
+
+            // 打开串口
+            boolean opened = serialPort.openPort();
+            if (!opened) {
+                log.error("无法打开串口: " + portName);
+                return false;
+            }
+            log.info("串口已打开: {}", portName);
+
+            // 设置串口参数
+            serialPort.setComPortParameters(9600, 8, 1, SerialPort.NO_PARITY);
+
+            // 设置读取超时
+            serialPort.setComPortTimeouts(
+                    SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
+                    100,  // 读取超时100ms
+                    0     // 写入超时0秒
+            );
+
+            inputStream = serialPort.getInputStream();
+            initialized = true;
+            log.info("串口初始化成功: {}", portName);
+
         } catch (Exception e) {
-            log.error("初始化输入流错误: " + e.getMessage());
-            e.printStackTrace();
+            log.error("初始化串口错误: {}", e.getMessage(), e);
             cleanup();
         }
+        return initialized;
     }
 
+    // ===================== 每秒读取一次 =====================
+    //@Scheduled(fixedRate = 1000)
+    public void scheduledRead() {
+        if (!initialized) {
+            initializeSerialPort();
+            if (!initialized) {
+                log.warn("串口初始化失败，跳过本次读取");
+                return;
+            }
+        }
+
+        readSerialData();
+    }
+
+    // ===================== 读取串口数据 =====================
     public void readSerialData() {
         readCount++;
-        log.info("=== 第 " + readCount + " 次读取 ===");
+        log.debug("=== 第 {} 次读取 ===", readCount);
 
-        if (inputStream == null) {
-            log.error("串口输入流未初始化");
-            // 尝试重新初始化
-            initializeInputStream();
+        if (inputStream == null || !initialized) {
+            log.error("串口未初始化");
+            initializeSerialPort();
             return;
         }
 
         try {
+            // 检查串口是否仍然打开
+            if (!serialPort.isOpen()) {
+                log.error("串口已关闭，重新初始化");
+                initialized = false;
+                initializeSerialPort();
+                return;
+            }
+
             // 读取串口数据
             ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
             byte[] tempBuffer = new byte[1024];
@@ -109,13 +166,14 @@ public class RS485WeightMonitor {
             byte[] receivedData = byteOutputStream.toByteArray();
 
             if (receivedData.length > 0) {
-                log.info("收到原始 HEX=" + bytesToHex(receivedData));
+                log.info("收到原始数据，字节数: {}", receivedData.length);
+                log.info("HEX: {}", bytesToHex(receivedData));
 
-                // 合并缓冲区
+            /*    // 合并缓冲区
                 byte[] newBuffer = new byte[buffer.length + receivedData.length];
                 System.arraycopy(buffer, 0, newBuffer, 0, buffer.length);
-                System.arraycopy(receivedData, 0, newBuffer, buffer.length, receivedData.length);
-                buffer = newBuffer;
+                System.arraycopy(receivedData, 0, newBuffer, buffer.length, receivedData.length);*/
+                buffer = receivedData;
 
                 // 处理完整的帧
                 int frameCount = 0;
@@ -127,24 +185,23 @@ public class RS485WeightMonitor {
                 }
 
                 if (frameCount > 0) {
-                    log.info("成功处理 " + frameCount + " 个完整帧");
+                    log.info("成功处理 {} 个完整帧", frameCount);
                 }
 
                 // 如果缓冲区还有剩余数据但不够一帧
                 if (buffer.length > 0 && buffer.length < 15) {
-                    log.info("缓冲区有 " + buffer.length + " 字节，等待下一帧数据");
+                    log.debug("缓冲区有 {} 字节，等待下一帧数据", buffer.length);
                 }
             } else {
-                log.info("本次读取无数据");
+                log.debug("本次读取无数据");
             }
 
         } catch (IOException e) {
-            log.error("读取串口数据错误: " + e.getMessage());
-            // 尝试重新初始化输入流
-            initializeInputStream();
+            log.error("读取串口数据错误: {}", e.getMessage(), e);
+            initialized = false;
+            initializeSerialPort();  // 重新初始化
         } catch (Exception e) {
-            log.error("数据处理错误: " + e.getMessage());
-            e.printStackTrace();
+            log.error("数据处理错误: {}", e.getMessage(), e);
         }
     }
 
@@ -166,41 +223,54 @@ public class RS485WeightMonitor {
 
     // ===================== 帧解析 =====================
     private void parseFrame(byte[] frame) {
-        log.info("完整帧 HEX=" + bytesToHex(frame));
-
         if (frame.length != 15) {
-            log.warn("帧长度异常 len=" + frame.length);
+            log.warn("帧长度异常 len={}", frame.length);
             return;
         }
 
-        byte[] expectedHeader = hexStringToByteArray("02 10 00 00 00 03 06");
-        byte[] actualHeader = Arrays.copyOfRange(frame, 0, 7);
+        // 检查帧头
+        boolean headerMatch = true;
+        for (int i = 0; i < EXPECTED_HEADER.length; i++) {
+            if (frame[i] != EXPECTED_HEADER[i]) {
+                log.warn("帧头第 {} 位不匹配: 期望={} 实际={}",
+                        i,
+                        String.format("%02X", EXPECTED_HEADER[i]),
+                        String.format("%02X", frame[i]));
+                headerMatch = false;
+                break;
+            }
+        }
 
-        if (!Arrays.equals(expectedHeader, actualHeader)) {
+        if (!headerMatch) {
             log.warn("帧头不匹配");
             return;
         }
 
+        // CRC校验
         int crcRecv = (frame[13] & 0xFF) | ((frame[14] & 0xFF) << 8);
         int crcCalc = crc16Modbus(Arrays.copyOfRange(frame, 0, 13));
 
-        log.info(String.format("CRC recv=0x%04X calc=0x%04X", crcRecv, crcCalc));
-
         if (crcRecv != crcCalc) {
-            log.error("CRC 校验失败");
+            log.error("CRC 校验失败: recv=0x{} calc=0x{}",
+                    String.format("%04X", crcRecv),
+                    String.format("%04X", crcCalc));
             return;
         }
-        // ===== 关键修正点 =====
-        // 有符号 32 位整数（补码）
+
+        // 解析重量数据 (字节 7-10)
         ByteBuffer buffer = ByteBuffer.wrap(Arrays.copyOfRange(frame, 7, 11));
         buffer.order(ByteOrder.BIG_ENDIAN);
         int weightKg = buffer.getInt();
 
         double weightT = Math.round(weightKg / 1000.0 * 1000.0) / 1000.0;
+
+        log.info("解析到重量: {} kg ({} t)", weightKg, weightT);
+
         List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
         boolean sendFlag = false;
+
         if (weightT < 2) {
-            log.info("weight < 2 send:{}", weightT);
+            log.info("weight < 2 send: {}", weightT);
             if (atomicBoolean.get()) {
                 log.info("Single weight: {}", weightT);
                 DeviceDataVO kaugnche = new DeviceDataVO();
@@ -223,28 +293,36 @@ public class RS485WeightMonitor {
         }
         singleWeight.set(weightT); // 单位是kg
 
-        log.info("sendFlag:{} sampleFlag:{}, atomicBoolean：{}",
+        log.debug("sendFlag: {} sampleFlag: {}, atomicBoolean：{}",
                 sendFlag,
                 DataConfigManager.getInstance().isSampleFlag(),
                 atomicBoolean.get());
+
         if (sendFlag && DataConfigManager.getInstance().isSampleFlag()) {
             messageSendService.batchSendMsg2Kafka("kaugnche", deviceDataVOS);
             atomicBoolean.set(false);
             atomicLong.set(0L);
         }
 
-        log.info(String.format("解析结果：%d kg  |  %.3f t", weightKg, weightT));
+        log.info("解析结果：{} kg | {} t", weightKg, weightT);
+    }
+
+    // ===================== 获取当前重量 =====================
+    public Double getCurrentWeight() {
+        return singleWeight.get();
     }
 
     // ===================== 清理资源 =====================
+    @PreDestroy
     public void cleanup() {
-        log.info("正在清理资源...");
+        log.info("正在清理串口资源...");
 
         if (inputStream != null) {
             try {
                 inputStream.close();
+                log.info("输入流已关闭");
             } catch (IOException e) {
-                log.error("关闭输入流错误: " + e.getMessage());
+                log.error("关闭输入流错误: {}", e.getMessage(), e);
             }
         }
 
@@ -257,24 +335,33 @@ public class RS485WeightMonitor {
             }
         }
 
-        log.info("资源清理完成");
+        initialized = false;
+        buffer = new byte[0];
+        log.info("串口资源清理完成");
+    }
+
+    // ===================== 手动关闭串口 =====================
+    public void closeSerialPort() {
+        cleanup();
+    }
+
+    // ===================== 手动打开串口 =====================
+    public boolean openSerialPort() {
+        if (initialized && serialPort != null && serialPort.isOpen()) {
+            log.info("串口已经打开");
+            return true;
+        }
+
+        initialized = false;
+        return initializeSerialPort();
     }
 
     // ===================== 工具函数 =====================
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
-            sb.append(String.format("%02X ", b));
+            sb.append(String.format("%02X ", b & 0xFF));
         }
         return sb.toString().trim();
-    }
-
-    private byte[] hexStringToByteArray(String hexString) {
-        String[] hexValues = hexString.split(" ");
-        byte[] bytes = new byte[hexValues.length];
-        for (int i = 0; i < hexValues.length; i++) {
-            bytes[i] = (byte) Integer.parseInt(hexValues[i], 16);
-        }
-        return bytes;
     }
 }

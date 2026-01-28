@@ -48,7 +48,7 @@ public class HeartService {
                     if (address instanceof Inet4Address) {
                         String ip = address.getHostAddress();
 
-                        KafkaUtils.send(kafkaHost, "heartbeat", "equipNo:" + equipNo + " IP:" + ip );
+                        KafkaUtils.send(kafkaHost, "heartbeat", "heartbeat","equipNo:" + equipNo + " IP:" + ip );
                     }
                 }
             }

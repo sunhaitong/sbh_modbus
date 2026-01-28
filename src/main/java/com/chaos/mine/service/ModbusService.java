@@ -13,11 +13,9 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -39,15 +37,60 @@ public class ModbusService {
     @Value("${equip.no:test}")
     private String equipNo;
 
-    private final SerialPort serialPort;
+    @Value("${scale.serial.portName:COM1}")
+    private String portName;
+
+    private SerialPort serialPort;
     private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
     private final AtomicReference<Double> totalWeight = new AtomicReference<>(0.0);
 
     private final AtomicBoolean atomicBoolean = new AtomicBoolean(false);
     private final AtomicLong  atomicLong = new AtomicLong(0L);
 
-    public ModbusService(SerialPort serialPort) {
-        this.serialPort = serialPort;
+    /**
+     * 打开串口
+     */
+    private synchronized void openSerialPort() {
+        if (serialPort != null && serialPort.isOpen()) {
+            return;
+        }
+
+        if (serialPort == null) {
+            serialPort = SerialPort.getCommPort(portName);
+            serialPort.setBaudRate(9600);
+            serialPort.setNumDataBits(8);
+            serialPort.setNumStopBits(SerialPort.ONE_STOP_BIT);
+            serialPort.setParity(SerialPort.NO_PARITY);
+        }
+
+        if (!serialPort.isOpen()) {
+            if (serialPort.openPort()) {
+                log.info("串口 {} 已打开", portName);
+            } else {
+                log.error("无法打开串口: {}", portName);
+                throw new RuntimeException("串口打开失败: " + portName);
+            }
+        }
+    }
+
+    /**
+     * 关闭串口
+     */
+    public synchronized void closeSerialPort() {
+        if (serialPort != null && serialPort.isOpen()) {
+            serialPort.closePort();
+            log.info("串口 {} 已关闭", portName);
+        }
+    }
+
+    /**
+     * 检查串口是否可用，不可用时重新打开
+     */
+    private void ensureSerialPortOpen() {
+        if (serialPort == null || !serialPort.isOpen()) {
+            log.warn("串口未打开，尝试重新打开...");
+            openSerialPort();
+        }
     }
 
     private byte[] readModbusResponseDynamic(InputStream in) throws Exception {
@@ -98,6 +141,7 @@ public class ModbusService {
 
         return fullResponse;
     }
+
     private boolean isModbusFrameComplete(byte[] data) {
         if (data.length < 2) return false;
 
@@ -137,28 +181,12 @@ public class ModbusService {
 
         return (data[data.length - 2] == crcLow && data[data.length - 1] == crcHigh);
     }
-    /*private byte[] sendAndReceive(byte[] request) throws Exception {
-        try (OutputStream out = serialPort.getOutputStream();
-             InputStream in = serialPort.getInputStream()) {
-
-            out.write(request);
-            out.flush();
-
-            Thread.sleep(100);
-
-            byte[] buffer = new byte[64];
-            int len = in.read(buffer);
-            if (len > 0) {
-                byte[] resp = new byte[len];
-                System.arraycopy(buffer, 0, resp, 0, len);
-                return resp;
-            }
-            return null;
-        } // 自动
-    }*/
 
     public synchronized void readWeights() {
         try {
+            // 确保串口已打开
+            ensureSerialPortOpen();
+
             // 读单铲重量 0x01 0x03 0x00 0x00 0x00 0x02 + CRC
             byte[] cmd1 = new byte[]{0x01, 0x03, 0x00, 0x00, 0x00, 0x02};
             byte[] crc1 = CRC16Util.getCRC(cmd1);
@@ -228,11 +256,15 @@ public class ModbusService {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("读取重量失败", e);
+            // 如果发生异常，关闭串口以便下次重连
+            closeSerialPort();
         }
     }
 
     private byte[] sendAndReceive(byte[] request) throws Exception {
+        ensureSerialPortOpen();
+
         try (OutputStream out = serialPort.getOutputStream();
              InputStream in = serialPort.getInputStream()) {
 

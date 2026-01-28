@@ -18,10 +18,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Service
+//@Service
 @Slf4j
 public class SerialReader {
-
+/*
     @Value("${rfid.serial.port.name:COM4}")
     private String portName;
     private static final int BAUD_RATE = 115200;
@@ -38,9 +38,9 @@ public class SerialReader {
     @Value("${equip.no:test}")
     private String equipNo;
 
-    /**
+    *//**
      * 初始化串口（应用启动时执行）
-     */
+     *//*
     @PostConstruct
     public void init() {
         try {
@@ -76,11 +76,11 @@ public class SerialReader {
         }
     }
 
-    /**
+    *//**
      * 定时读取串口数据（每3秒执行一次）
-     */
-    /*@Scheduled(fixedDelay = 1000)
-    @Async*/
+     *//*
+    *//*@Scheduled(fixedDelay = 1000)
+    @Async*//*
     public void readSerialData() {
         cache.clear();
         if (comPort == null || !comPort.isOpen()) {
@@ -92,7 +92,7 @@ public class SerialReader {
             // 检查是否有数据可读
             int bytesAvailable = comPort.bytesAvailable();
             if (bytesAvailable > 0) {
-               /* // 读取所有可用数据到临时缓冲区
+               *//* // 读取所有可用数据到临时缓冲区
                 byte[] tempBuffer = new byte[bytesAvailable];
                 int bytesRead = comPort.readBytes(tempBuffer, bytesAvailable);
 
@@ -105,7 +105,7 @@ public class SerialReader {
                     processBufferData();
                 } else {
                     log.info("无数据可读");
-                }*/
+                }*//*
                 byte[] buffer = new byte[bytesAvailable];
                 int bytesRead = comPort.readBytes(buffer, bytesAvailable);
 
@@ -143,9 +143,9 @@ public class SerialReader {
         }
     }
 
-    /**
+    *//**
      * 处理两个字节的数据
-     */
+     *//*
     private void processTwoBytes(byte[] data) {
         if (data.length != 2) {
             log.warn("数据长度不是2个字节");
@@ -180,15 +180,15 @@ public class SerialReader {
         }
     }
 
-    /**
+    *//**
      * 关闭串口（应用关闭时执行）
-     */
+     *//*
     @PreDestroy
     public void close() {
         if (comPort != null && comPort.isOpen()) {
             comPort.closePort();
             log.info("串口已关闭");
         }
-    }
+    }*/
 
 }

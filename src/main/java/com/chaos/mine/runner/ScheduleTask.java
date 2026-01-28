@@ -26,9 +26,6 @@ public class ScheduleTask {
     private ModbusService modbusService;
 
     @Autowired
-    private SerialReader serialReader;
-
-    @Autowired
     private ADCMonitorService adcMonitorService;
 
     @Autowired
@@ -40,6 +37,8 @@ public class ScheduleTask {
     @Autowired
     private CanWeightReader canWeightReader;
 
+    @Autowired
+    private RfidReaderService rfidReaderService;
 
 
     @Autowired
@@ -52,8 +51,9 @@ public class ScheduleTask {
     @Async
     public void sample(){
         new Thread(() -> {
-            log.info("readSerialData");
-            serialReader.readSerialData();
+            log.info("readRfidData");
+            rfidReaderService.readRfidTask();
+            //serialReader.readSerialData();
 
             log.info("monitorADC");
             adcMonitorService.monitorADC();
@@ -72,7 +72,7 @@ public class ScheduleTask {
                 modbusService.readWeights();
             } else if (kaungcheFlag == 2) {
                 log.info("GHH矿卡 rs485WeightMonitor");
-                rs485WeightMonitor.readSerialData();
+                rs485WeightMonitor.scheduledRead();
             }else if (kaungcheFlag == 3) {
                 log.info("安百拓矿卡 readWeights");
                 canWeightReader.getLatestWeightTons();
