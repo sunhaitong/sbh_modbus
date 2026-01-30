@@ -44,6 +44,9 @@ public class ScheduleTask {
     @Autowired
     private RS485WeightMonitor rs485WeightMonitor;
 
+/*    @Autowired
+    private DistanceSensorService distanceSensorService;*/
+
     @Value("${sampling.kuangche.flag:1}")
     private Integer kaungcheFlag;
 
@@ -78,8 +81,11 @@ public class ScheduleTask {
                 canWeightReader.getLatestWeightTons();
 
             }
+/*
 
-
+            log.info("distance read.");
+            distanceSensorService.readDistance();
+*/
 
         }).start();
     }

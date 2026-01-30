@@ -1,104 +1,183 @@
 package com.chaos.mine.service;
 
-import com.fazecast.jSerialComm.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import com.serotonin.modbus4j.ModbusFactory;
+import com.serotonin.modbus4j.ModbusMaster;
+import com.serotonin.modbus4j.exception.ModbusInitException;
+import com.serotonin.modbus4j.locator.BaseLocator;
+import com.serotonin.modbus4j.serial.SerialPortWrapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * 测距
- *
- */
-//@Service
+@Slf4j
+@Service
 public class DistanceSensorService {
-
-    private static final String PORT_NAME = "COM3";
+/*
+    *//* ================= 基础参数 ================= *//*
+    private static final String PORT = "COM3";
     private static final int SLAVE_ID = 2;
+
     private static final int ENCODER_RESOLUTION = 1024;
     private static final double WHEEL_CIRCUM_MM = 100.0;
-    private static final double ZERO_THRESHOLD_M = 0.005;
 
-    private SerialPort serialPort;
-    private int base = 0;
-    private double maxDistance = 0.0;
+    *//* ================= 算法参数 ================= *//*
+    private static final double ZERO_THRESHOLD_M = 0.005;     // 自动归零阈值
+    private static final double NOISE_THRESHOLD_M = 0.0005;  // 抖动死区
+    private static final double MIN_VALID_STROKE_M = 0.02;   // 最小有效拉伸
 
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
+    *//* ================= 状态变量 ================= *//*
+    private final AtomicLong base = new AtomicLong(0);
 
-    @PostConstruct
-    public void init() {
-        serialPort = SerialPort.getCommPort(PORT_NAME);
-        serialPort.setBaudRate(9600);
-        serialPort.setNumDataBits(8);
-        serialPort.setNumStopBits(1);
-        serialPort.setParity(SerialPort.NO_PARITY);
-        serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 1000, 0);
+    private volatile ModbusMaster master;
 
-        if (!serialPort.openPort()) {
-            System.err.println("串口连接失败");
-            return;
+    private double lastDistance = 0;
+    private double lastDelta = 0;
+    private double maxCandidate = 0;
+
+    *//* ================= 定时采样（20Hz） ================= *//*
+    @Scheduled(fixedRate = 50)
+    public void sample() {
+        try {
+            ensureConnected();
+
+            int high = readHolding(0);
+            int low = readHolding(1);
+
+            long encoder = ((long) high << 16) | (low & 0xFFFF);
+
+            double distanceM = calcDistance(encoder);
+
+            // 自动归零
+            if (Math.abs(distanceM) < ZERO_THRESHOLD_M) {
+                base.set(encoder);
+                resetState();
+                return;
+            }
+
+            processSample(distanceM);
+
+        } catch (Exception e) {
+            log.error("采样异常，释放串口，等待下次恢复", e);
+            destroyMaster();
         }
-        System.out.println("开始持续读取位移（单位：米，带自动归零），Ctrl+C 退出\n");
     }
 
-    public void readDistance() {
-        if (serialPort == null || !serialPort.isOpen()) return;
+    *//* ================= 核心算法 ================= *//*
+    private void processSample(double distance) {
+        double delta = distance - lastDistance;
 
-        byte[] buffer = new byte[4]; // 2个寄存器，每个2字节
-        int bytesRead = serialPort.readBytes(buffer, buffer.length);
+        // 抖动死区
+        if (Math.abs(delta) < NOISE_THRESHOLD_M) {
+            delta = 0;
+        }
 
-        if (bytesRead != 4) {
-            System.err.println("读取失败，字节数不足");
+        // 拉伸阶段：记录最大值
+        if (delta > 0) {
+            maxCandidate = Math.max(maxCandidate, distance);
+        }
+
+        // 方向反转：拉伸 → 回缩
+        if (lastDelta > 0 && delta <= 0) {
+            if (maxCandidate >= MIN_VALID_STROKE_M) {
+                onRealMeasurement(maxCandidate);
+            }
+            maxCandidate = 0;
+        }
+
+        lastDelta = delta;
+        lastDistance = distance;
+    }
+
+    *//* ================= 真实测量值回调 ================= *//*
+    private void onRealMeasurement(double value) {
+        log.info("🎯 真实测量值 = {} m", String.format("%.4f", value));
+
+        // 👉 这里你可以：
+        // 1. 存数据库
+        // 2. 发 Kafka
+        // 3. 推 WebSocket
+    }
+
+    *//* ================= 位移计算 ================= *//*
+    private double calcDistance(long encoder) {
+        double mm =
+                (encoder - base.get()) * WHEEL_CIRCUM_MM / ENCODER_RESOLUTION;
+        return mm / 1000.0;
+    }
+
+    *//* ================= Modbus 读取 ================= *//*
+    private int readHolding(int offset) throws Exception {
+        BaseLocator<Number> locator =
+                BaseLocator.holdingRegister(SLAVE_ID, offset, 0);
+        return master.getValue(locator).intValue();
+    }
+
+    *//* ================= 串口懒加载 ================= *//*
+    private synchronized void ensureConnected() throws ModbusInitException {
+        if (master != null) {
             return;
         }
 
-        // Modbus RTU 寄存器数据，假设高位在前
-        int high = ((buffer[0] & 0xFF) << 8) | (buffer[1] & 0xFF);
-        int low  = ((buffer[2] & 0xFF) << 8) | (buffer[3] & 0xFF);
-        int encoderValue = (high << 16) | low;
+        log.info("初始化 Modbus RTU 串口...");
 
-        // 位移计算
-        double distanceMm = (encoderValue - base) * WHEEL_CIRCUM_MM / ENCODER_RESOLUTION;
-        double distanceM = distanceMm / 1000.0;
+        SerialPortWrapper wrapper = new SerialPortWrapper() {
+            @Override public void open() {
+                master.init();
+            }
 
-        // 自动归零逻辑
-        String state;
-        if (Math.abs(distanceM) < ZERO_THRESHOLD_M) {
-            base = encoderValue;
-            distanceM = 0.0;
-            state = "零位(自动归零)";
-        } else {
-            state = distanceM > 0 ? "拉出" : "回缩";
-        }
+            @Override
+            public InputStream getInputStream() {
+                return null;
+            }
 
-        // 更新最大距离
-        if (distanceM > maxDistance) {
-            maxDistance = distanceM;
-            sendToKafka(maxDistance);
-        }
+            @Override
+            public OutputStream getOutputStream() {
+                return null;
+            }
 
-        System.out.printf(
-                "寄存器HEX: [0x%04X, 0x%04X] | 编码器值: %6d | 位移: %8.4f m | 状态: %s | 最长距离: %8.4f m%n",
-                high, low, encoderValue, distanceM, state, maxDistance
-        );
+            @Override public void close() {}
+            @Override public String getPortName() { return PORT; }
+            @Override public int getBaudRate() { return 9600; }
+            @Override public int getDataBits() { return 8; }
+            @Override public int getStopBits() { return 1; }
+            @Override public int getParity() { return 0; }
+            @Override public int getFlowControlIn() { return 0; }
+            @Override public int getFlowControlOut() { return 0; }
+        };
+
+        ModbusFactory factory = new ModbusFactory();
+        master = factory.createRtuMaster(wrapper);
+        master.setTimeout(500);
+        master.setRetries(1);
+        master.init();
+
+        log.info("Modbus RTU 串口已连接");
     }
 
-    private void sendToKafka(double distance) {
-        String message = String.format("最长距离更新: %.4f 米", distance);
-        kafkaTemplate.send("distance-topic", message);
-        System.out.println("已发送到 Kafka: " + message);
+    *//* ================= 释放串口 ================= *//*
+    private synchronized void destroyMaster() {
+        if (master != null) {
+            try {
+                master.destroy();
+            } catch (Exception ignore) {}
+            master = null;
+        }
+    }
+
+    private void resetState() {
+        lastDistance = 0;
+        lastDelta = 0;
+        maxCandidate = 0;
     }
 
     @PreDestroy
-    public void cleanup() {
-        if (serialPort != null && serialPort.isOpen()) {
-            serialPort.closePort();
-            System.out.println("串口已关闭");
-        }
-    }
+    public void shutdown() {
+        destroyMaster();
+        log.info("服务关闭，串口释放");
+    }*/
 }
