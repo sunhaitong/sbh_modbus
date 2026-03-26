@@ -6,10 +6,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PreDestroy;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -280,6 +277,64 @@ public class OfflineMsgDao {
 
         } catch (Exception e) {
             log.error("deleteById error", e);
+        }
+    }
+
+    /**
+     * 批量删除 - 分批使用IN子句，避免SQL语句过长
+     * @param ids 要删除的ID列表
+     * @param batchSize 每批最大数量
+     */
+    public void batchDeleteInBatches(List<Long> ids, int batchSize) {
+        if (ids == null || ids.isEmpty()) {
+            log.warn("batchDeleteInBatches: ids is empty");
+            return;
+        }
+
+        // 默认每批1000个
+        if (batchSize <= 0) {
+            batchSize = 1000;
+        }
+
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            conn.setAutoCommit(false);
+
+            int totalDeleted = 0;
+
+            // 分批处理
+            for (int i = 0; i < ids.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, ids.size());
+                List<Long> batchIds = ids.subList(i, end);
+
+                String placeholders = String.join(",", Collections.nCopies(batchIds.size(), "?"));
+                String sql = "DELETE FROM offline_msg WHERE id IN (" + placeholders + ")";
+
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    // 设置参数
+                    for (int j = 0; j < batchIds.size(); j++) {
+                        ps.setLong(j + 1, batchIds.get(j));
+                    }
+
+                    int deleted = ps.executeUpdate();
+                    totalDeleted += deleted;
+
+                    // 每批提交一次
+                    conn.commit();
+
+                    log.info("batchDeleteInBatches: batch {}-{} deleted {} records",
+                            i, end, deleted);
+                }
+            }
+
+            log.info("batchDeleteInBatches: total deleted {} records", totalDeleted);
+
+        } catch (Exception e) {
+            log.error("batchDeleteInBatches error", e);
+            try (Connection conn = DriverManager.getConnection(DB_URL)) {
+                conn.rollback();
+            } catch (Exception ex) {
+                log.error("rollback error", ex);
+            }
         }
     }
 

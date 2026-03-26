@@ -1,9 +1,11 @@
 package com.chaos.mine.runner;
 
 import com.fazecast.jSerialComm.SerialPort;
+import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 
 /**
  * @ClassName sunht
@@ -12,22 +14,16 @@ import org.springframework.context.annotation.Configuration;
  * @Version 1.0
  */
 
-//@Configuration
+@Data
+@Component
 public class SerialConfig {
 
     @Value("${scale.serial.portName:COM1}")
     private String portName;
-
-    @Bean
-    public SerialPort serialPort() {
-        SerialPort port = SerialPort.getCommPort(portName); // 修改为你的实际串口
-        port.setBaudRate(9600);
-        port.setNumDataBits(8);
-        port.setNumStopBits(SerialPort.ONE_STOP_BIT);
-        port.setParity(SerialPort.NO_PARITY);
-        if (!port.openPort()) {
-            throw new RuntimeException("无法打开串口！");
-        }
-        return port;
-    }
+    private int baudRate = 9600;
+    private int dataBits = 8;
+    private int stopBits = 1;
+    private int parity = 0; // 0:无校验, 1:奇校验, 2:偶校验
+    private int readTimeout = 1000;
+    private int frameTimeout = 50;
 }

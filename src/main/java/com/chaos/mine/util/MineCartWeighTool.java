@@ -1,4 +1,7 @@
 package com.chaos.mine.util;
+import com.alibaba.fastjson.JSON;
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 3. 内存保护：最大缓存容量+超时自动清理
  * 4. 支持多矿车独立处理（通过矿车ID区分）
  */
+@Slf4j
 public final class MineCartWeighTool {
     // ===================== 可配置常量（可根据业务调整） =====================
     /** 开始/停止缓存的重量阈值(t) */
@@ -120,11 +124,13 @@ public final class MineCartWeighTool {
     public static double calculateRealWeight(String cartId) {
         // 参数校验
         if (cartId == null || cartId.trim().isEmpty()) {
+            log.info("cartId is null or empty");
             return 0.0;
         }
 
         CartContext context = CART_CONTEXT_MAP.get(cartId);
-        if (context == null || context.state != WeighState.COMPLETED || context.weightCache.isEmpty()) {
+        if (context == null || context.weightCache.isEmpty()) {
+            log.info("context：{} context.state:{} context.weightCacheSize:{}", cartId, context.state, context.weightCache.size());
             return 0.0;
         }
 
@@ -134,6 +140,7 @@ public final class MineCartWeighTool {
             List<Double> sortedData = new ArrayList<>(context.weightCache);
             Collections.sort(sortedData);
 
+            log.info("cache weight：{}", JSON.toJSONString(sortedData));
             // 2. 计算剔除数量（避免剔除后无数据）
             int totalSize = sortedData.size();
             int trimCount = (int) Math.round(totalSize * TRIM_PERCENT);
@@ -141,9 +148,10 @@ public final class MineCartWeighTool {
 
             // 3. 截取中间数据并计算均值
             List<Double> filteredData = sortedData.subList(trimCount, totalSize - trimCount);
+            log.info("filteredData weight：{}", JSON.toJSONString(filteredData));
             double sum = filteredData.stream().mapToDouble(Double::doubleValue).sum();
             double average = sum / filteredData.size();
-
+            log.info("filteredData sum：{}, average:{}", sum, average);
             // 4. 重置当前矿车的上下文（准备下一次采集）
             resetCartContext(context);
 

@@ -1,6 +1,7 @@
 package com.chaos.mine;
 
 import com.chaos.mine.entity.TboxSignalData;
+import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.service.ModbusService;
 import com.chaos.mine.service.ModbusTcpService;
 import com.chaos.mine.service.TboxDataService;
@@ -32,10 +33,11 @@ public class DataController {
     private TboxDataService tboxDataService;
 
     @GetMapping("/weight")
-    public Map<String, Double> getWeights() {
-        Map<String, Double> result = new HashMap<>();
+    public Map<String, Object> getWeights() {
+        Map<String, Object> result = new HashMap<>();
         result.put("singleWeight", modbusService.getSingleWeight());
         result.put("totalWeight", modbusService.getTotalWeight());
+        result.put("onlineStatus", DataConfigManager.getInstance().isOlineStatus());
         return result;
     }
 

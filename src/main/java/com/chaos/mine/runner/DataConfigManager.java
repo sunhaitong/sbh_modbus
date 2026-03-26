@@ -54,6 +54,8 @@ public class DataConfigManager {
 
     private volatile boolean sampleFlag = false;
 
+    private volatile boolean olineStatus = false;
+
     /**
      * 氢气
      */

@@ -1,5 +1,6 @@
 package com.chaos.mine.runner;
 
+import cn.hutool.core.date.StopWatch;
 import com.chaos.mine.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,46 +51,74 @@ public class ScheduleTask {
     @Value("${sampling.kuangche.flag:1}")
     private Integer kaungcheFlag;
 
+    @Value("${switch.flag:1}")
+    private Integer switchFlag;
+
+    @Value("${rfid.flag:1}")
+    private Integer rfidFlag;
+
+    @Value("${distance.flag:1}")
+    private Integer distanceFlag;
+
+    @Autowired
+    private EncoderReadTask encoderReadTask;
+
+
     @Scheduled(fixedDelay = 1000)
     @Async
     public void sample(){
-        new Thread(() -> {
-            log.info("readRfidData");
-            rfidReaderService.readRfidTask();
-            //serialReader.readSerialData();
+        //log.info("readRfidData");
 
-            log.info("monitorADC");
-            adcMonitorService.monitorADC();
+        //serialReader.readSerialData();
 
-            log.info("readTcpData");
-            tcpService.readTcpData();
+        log.info("readTcpData");
+        tcpService.readTcpData();
 
-            log.info("readSerialDataPeriodically");
-            tboxDataService.readSerialDataPeriodically();
+        log.info("readSerialDataPeriodically");
+        tboxDataService.readSerialDataPeriodically();
 
-            log.info("heartBeat");
-            heartService.heartBeat();
+        if (distanceFlag == 1) {
+            log.info("distance read.");
+            encoderReadTask.readEncoder();
+        } else {
+            log.info("distance read.... off");
+        }
 
-            if (kaungcheFlag == 1) {
-                log.info("领拓 readWeights");
-                modbusService.readWeights();
-            } else if (kaungcheFlag == 2) {
-                log.info("GHH矿卡 rs485WeightMonitor");
-                rs485WeightMonitor.scheduledRead();
-            }else if (kaungcheFlag == 3) {
-                log.info("安百拓矿卡 readWeights");
-                canWeightReader.getLatestWeightTons();
+        if (kaungcheFlag == 1) {
+            log.info("领拓 readWeights");
+            modbusService.readWeights();
+        } else if (kaungcheFlag == 2) {
+            log.info("GHH矿卡 rs485WeightMonitor");
+            rs485WeightMonitor.scheduledRead();
+        }else if (kaungcheFlag == 3) {
+            log.info("安百拓矿卡 readWeights");
+            canWeightReader.getLatestWeightTons();
 
-            }
+        }
 /*
 
             log.info("distance read.");
             distanceSensorService.readDistance();
 */
-
-        }).start();
     }
 
+    @Scheduled(fixedDelay = 180000)
+    @Async
+    public void  readSwitch() {
+        log.info("monitorADC");
+        if (switchFlag == 1) {
+            adcMonitorService.monitorADC();
+        } else {
+            adcMonitorService.readSwitch2();
+        }
+    }
+
+    @Scheduled(fixedRate = 30000)
+    @Async
+    public void heartBeat() {
+        log.info("heartBeat");
+        heartService.heartBeat();
+    }
     /*@Scheduled(fixedRate = 1000)
     @Async*/// 每2秒读取一次
     public void readModbusData() {
@@ -104,5 +133,16 @@ public class ScheduleTask {
     public void readTcp() {
         log.info("readTcp");
         tcpService.readTcpData();
+    }
+
+    @Scheduled(fixedRate = 1000)
+    @Async
+    public void readRfid() {
+        if (rfidFlag == 1) {
+            log.info("rfid read.");
+            rfidReaderService.readRfidTask();
+        } else {
+            log.info("rfid read..... off");
+        }
     }
 }

@@ -21,5 +21,15 @@ public class MyCommandLineRunner implements CommandLineRunner {
     public void run(String... args) throws Exception {
         DataConfigManager.getInstance().loadDataStandardConfig();
         canWeightReader.read();
+
+        // 初始化音量
+        try {
+            Process p1 = new ProcessBuilder(
+                    "amixer", "-c", "0", "sset", "PCM", "100%"
+            ).start();
+            p1.waitFor();
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
     }
 }

@@ -5,11 +5,13 @@ import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * kafka工具类
@@ -26,28 +28,29 @@ public class KafkaUtils {
      */
     private static final Map<String, KafkaProducer<String, String>> producerCache = new ConcurrentHashMap<>();
 
-    /**
-     * 创建producer
-     *
-     * @param brokers
-     * @return
-     */
     private static KafkaProducer<String, String> createProducer(String brokers) {
         Properties prop = new Properties();
         prop.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers);
-        // prop.put(ProducerConfig.ACKS_CONFIG, "-1");
         prop.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         prop.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        // 核心：快速失败
-        prop.put(ProducerConfig.RETRIES_CONFIG, 0);
-        prop.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 300);
-        prop.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 300);
-        prop.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 500);
-        prop.put(ProducerConfig.ACKS_CONFIG, "1");
+
+        // ★★★ 核心优化配置
+        prop.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);      // 16KB 批处理大小
+        prop.put(ProducerConfig.LINGER_MS_CONFIG, 5);           // 等待5ms凑批
+        prop.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432); // 32MB 缓冲区
+        prop.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy"); // 压缩
+
+        // 超时配置（用于快速失败）
+        prop.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 3000);     // 最大阻塞时间
+        prop.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 3000);
+        prop.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 5000);
+
+        // 重试和确认
+        prop.put(ProducerConfig.RETRIES_CONFIG, 0);             // 不重试（快速失败）
+        prop.put(ProducerConfig.ACKS_CONFIG, "1");              // leader确认
+
         return new KafkaProducer<>(prop);
     }
-
-
     /**
      * 关闭
      */
@@ -144,6 +147,40 @@ public class KafkaUtils {
         producer.send(record).get(1, TimeUnit.SECONDS);
     }
 
+    /**
+     * 或者使用 Java 8 的 CompletableFuture 版本（更简洁）
+     */
+    public static boolean sendBatchAsync(String brokers, String topic, List<String> messages) {
+        if (messages.isEmpty()) return false;
+
+        KafkaProducer<String, String> producer = getProducer(brokers);
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        for (String msg : messages) {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            producer.send(new ProducerRecord<>(topic, msg), (metadata, exception) -> {
+                if (exception == null) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(exception);
+                }
+            });
+            futures.add(future);
+        }
+
+        try {
+            // 等待所有发送完成
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(10, TimeUnit.SECONDS);
+            producer.flush();
+            log.info("批量发送成功: {} 条", messages.size());
+            return true;
+        } catch (Exception e) {
+            log.error("批量发送失败", e);
+            return false;
+        }
+    }
+
     /** 同步发送带 key */
     public static void sendSync(String brokers, String topic, String key, String msg) throws Exception {
         KafkaProducer<String, String> producer = getProducer(brokers);
@@ -164,4 +201,5 @@ public class KafkaUtils {
             e.printStackTrace();
         }
     }
+
 }
