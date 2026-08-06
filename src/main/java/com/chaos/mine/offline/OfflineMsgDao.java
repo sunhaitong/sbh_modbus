@@ -12,7 +12,7 @@ import java.util.*;
 @Component
 public class OfflineMsgDao {
 
-    private static final String DB_URL = "jdbc:sqlite:/opt/app/data/offline.db?journal_mode=WAL&synchronous=NORMAL&cache_size=-2000&busy_timeout=5000";
+    private static final String DB_URL = "jdbc:sqlite:/data/sql/offline.db?journal_mode=WAL&synchronous=NORMAL&cache_size=-2000&busy_timeout=5000";
 
     // 使用连接池优化（单例连接）
     private volatile Connection sharedConnection = null;

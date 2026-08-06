@@ -42,30 +42,33 @@ public class EncoderReadTask {
     private LaShengService modbusService;
 
 
+    @Scheduled(fixedDelay = 500)
     public void readEncoder() {
-        try {
-            short [] regs = modbusService.readHoldingRegisters(0x0000, 2);
+        new Thread(() ->{
+            try {
+                short [] regs = modbusService.readHoldingRegisters(0x0000, 2);
 
-            int high = regs[0] & 0xFFFF;
-            int low = regs[1] & 0xFFFF;
+                int high = regs[0] & 0xFFFF;
+                int low = regs[1] & 0xFFFF;
 
-            long encoderValue = ((long) high << 16) | low;
+                long encoderValue = ((long) high << 16) | low;
 
-            double distanceMm =
-                    (encoderValue - base.get()) * WHEEL_CIRCUM_MM / ENCODER_RESOLUTION;
-            double distanceM = distanceMm / 1000.0;
+                double distanceMm =
+                        (encoderValue - base.get()) * WHEEL_CIRCUM_MM / ENCODER_RESOLUTION;
+                double distanceM = distanceMm / 1000.0;
 
-            // 自动归零
-            if (Math.abs(distanceM) < ZERO_THRESHOLD_M) {
-                base.set(encoderValue);
-                resetState();
-                return;
+                // 自动归零
+                if (Math.abs(distanceM) < ZERO_THRESHOLD_M) {
+                    base.set(encoderValue);
+                    resetState();
+                    return;
+                }
+
+                processSample(distanceM);
+            } catch (Exception e) {
+                System.err.println("Modbus 读取失败：" + e.getMessage());
             }
-
-            processSample(distanceM);
-        } catch (Exception e) {
-            System.err.println("Modbus 读取失败：" + e.getMessage());
-        }
+        }).start();
     }
 
     private void resetState() {

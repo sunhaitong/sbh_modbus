@@ -315,4 +315,59 @@ public class SerialPortManager {
             rwLock.writeLock().unlock();
         }
     }
+
+    /**
+     * ===================== 新增：发送数据方法 =====================
+     */
+
+    /**
+     * 发送字节数组数据
+     * @param data 要发送的数据
+     * @return 是否发送成功
+     */
+    public boolean sendData(byte[] data) {
+        if (data == null || data.length == 0) {
+            log.warn("发送数据为空");
+            return false;
+        }
+
+        rwLock.readLock().lock();
+        try {
+            ensureInitialized();
+            if (outputStream == null) {
+                log.error("输出流为空，无法发送数据");
+                return false;
+            }
+
+            outputStream.write(data);
+            outputStream.flush();
+
+            log.debug("发送数据成功: {} 字节, HEX={}", data.length, bytesToHex(data));
+            return true;
+
+        } catch (IOException e) {
+            log.error("发送数据失败: {}", e.getMessage(), e);
+            return false;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * 字节数组转十六进制字符串（用于日志）
+     */
+    private String bytesToHex(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(bytes.length, 100); i++) {
+            sb.append(String.format("%02X ", bytes[i] & 0xFF));
+        }
+        if (bytes.length > 100) {
+            sb.append("...");
+        }
+        return sb.toString().trim();
+    }
+
 }

@@ -63,9 +63,12 @@ public class ScheduleTask {
     @Autowired
     private EncoderReadTask encoderReadTask;
 
+    @Autowired
+    private  PressureMonitor pressureMonitor;
+
 
     @Scheduled(fixedDelay = 1000)
-    @Async
+    //@Async
     public void sample(){
         //log.info("readRfidData");
 
@@ -74,16 +77,26 @@ public class ScheduleTask {
         log.info("readTcpData");
         tcpService.readTcpData();
 
-        log.info("readSerialDataPeriodically");
-        tboxDataService.readSerialDataPeriodically();
 
-        if (distanceFlag == 1) {
+       /* if (distanceFlag == 1) {
             log.info("distance read.");
             encoderReadTask.readEncoder();
         } else {
             log.info("distance read.... off");
-        }
+        }*/
 
+
+/*
+
+            log.info("distance read.");
+            distanceSensorService.readDistance();
+*/
+
+
+    }
+
+    @Scheduled(fixedDelay = 1000)
+    public void readWeights(){
         if (kaungcheFlag == 1) {
             log.info("领拓 readWeights");
             modbusService.readWeights();
@@ -95,14 +108,16 @@ public class ScheduleTask {
             canWeightReader.getLatestWeightTons();
 
         }
-/*
-
-            log.info("distance read.");
-            distanceSensorService.readDistance();
-*/
     }
 
-    @Scheduled(fixedDelay = 180000)
+    @Scheduled(fixedDelay = 1000)
+    //@Async
+    public void readSerialDataPeriodically(){
+        log.info("readSerialDataPeriodically");
+        tboxDataService.readSerialDataPeriodically();
+    }
+
+    @Scheduled(fixedRate = 10000)
     @Async
     public void  readSwitch() {
         log.info("monitorADC");
@@ -114,7 +129,6 @@ public class ScheduleTask {
     }
 
     @Scheduled(fixedRate = 30000)
-    @Async
     public void heartBeat() {
         log.info("heartBeat");
         heartService.heartBeat();

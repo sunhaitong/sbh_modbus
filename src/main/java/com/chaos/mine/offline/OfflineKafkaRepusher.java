@@ -52,6 +52,10 @@ public class OfflineKafkaRepusher {
         new Thread(() -> {
             while (true) {
                 try {
+                    if (!DataConfigManager.getInstance().isOlineStatus()) {
+                        Thread.sleep(1000);
+                        continue;
+                    }
                     List<OfflineMsg> msgs = dao.queryOldest(2000);
                     dataCount = msgs.size();
 
@@ -80,7 +84,7 @@ public class OfflineKafkaRepusher {
                         }
                     }
 
-                    Thread.sleep(1000);
+
 
                 } catch (Exception e) {
                     log.error("Resend loop error", e);
@@ -94,10 +98,10 @@ public class OfflineKafkaRepusher {
     @Async
     public void checkNetwork() {
         if (!ping()) {
-            log.info("Check network not OK");
+            //log.info("Check network not OK");
             DataConfigManager.getInstance().setOlineStatus(false);
         } else {
-            log.info("Check network OK");
+            //log.info("Check network OK");
             DataConfigManager.getInstance().setOlineStatus(true);
             if (dataCount > 0) {
                 // 正在传输数据

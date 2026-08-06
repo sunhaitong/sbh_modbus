@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @ClassName sunht
@@ -52,7 +53,7 @@ public class TboxDataService {
 
     // 核心组件
     private SerialPort serialPort; // 串口对象
-    private final Map<String, Object> signalMap = new HashMap<>(); // 信号存储容器
+    private final ConcurrentHashMap<String, Object> signalMap = new ConcurrentHashMap<>(); // 信号存储容器
     private final StringBuilder dataBuffer = new StringBuilder(); // 数据接收缓冲区
     private boolean isTboxReady = false; // TBOX就绪标志
     private long powerOnTime; // 上电时间戳（用于计算初始化耗时）
@@ -255,6 +256,10 @@ public class TboxDataService {
         }
 
         return resultMap;
+    }
+
+    public double getFuelTotal() {
+        return signalMap.get("Fuel_Total") == null ? 0 : (double) signalMap.get("Fuel_Total");
     }
 
     // 服务销毁时关闭串口（释放硬件资源）

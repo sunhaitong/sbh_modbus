@@ -1,5 +1,6 @@
 package com.chaos.mine.offline;
 ;
+import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.KafkaUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,13 +33,21 @@ public class DataService {
             topic = kafkaTopic;
         }
         // boolean res = asyncKafkaSender.sendWithTimeout(kafkaHost, topic, key, msg);
-        boolean res = KafkaUtils.send(kafkaHost, topic, key, msg);
-        if (cacheFlag && !res) {
+        if (DataConfigManager.getInstance().isOlineStatus()) {
+            boolean res = KafkaUtils.send(kafkaHost, topic, key, msg);
+            if (cacheFlag && !res) {
+                boolean offerSuccess = offlineQueue.offer(msg);
+                if (!offerSuccess) {
+                    log.error("离线队列已满，消息丢失: {}");
+                }
+            }
+        } else {
             boolean offerSuccess = offlineQueue.offer(msg);
             if (!offerSuccess) {
                 log.error("离线队列已满，消息丢失: {}");
             }
         }
+
     }
 }
 

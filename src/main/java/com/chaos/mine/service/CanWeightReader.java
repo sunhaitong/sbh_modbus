@@ -40,9 +40,17 @@ public class CanWeightReader {
 
     @Value("${equip.no:test}")
     private String equipNo;
+    private volatile double lastFuel = 0;               // 上次油耗
+
+    private volatile boolean hasPerformedClearTotal = false;
 
     @Autowired
     private MessageSendService messageSendService;
+
+    @Autowired
+    private TboxDataService tboxDataService;
+
+    private volatile boolean loadingSatus= false;
 
     // ===== libc 映射 =====
     public interface LibC extends Library {
@@ -150,6 +158,11 @@ public class CanWeightReader {
     }
 
     public void getLatestWeightTons() {
+        if (!hasPerformedClearTotal) {
+            atomicLong.set(System.currentTimeMillis());
+            hasPerformedClearTotal = true;
+
+        }
         Double tons = latestWeightTons.get();
         if (tons != null) {
             log.info("{} 最新重量: {}} 吨", LocalDateTime.now(), tons);
@@ -159,23 +172,28 @@ public class CanWeightReader {
                 log.info("weight < 2 send:{}", tons);
                 if (atomicBoolean.get()) {
                     log.info("Single weight: {}", tons);
+                    double curFuelTotal = tboxDataService.getFuelTotal();
                     DeviceDataVO kaugnche = new DeviceDataVO();
                     kaugnche.setEquipNum(equipNo);
                     kaugnche.setPointNum("kaugnche");
                     kaugnche.setParamNum("kaungche_weight");
                     kaugnche.setValue(MineCartWeighTool.calculateRealWeight(equipNo));
                     kaugnche.setSampleTime(System.currentTimeMillis());
-                    kaugnche.setRecvTime(atomicLong.get());
+                    kaugnche.setRecvTime(System.currentTimeMillis() - atomicLong.get());
+                    kaugnche.setFuelTotal(curFuelTotal - lastFuel);
                     deviceDataVOS.add(kaugnche);
                     sendFlag = true;
+                    //lastFuel = curFuelTotal;
                 } else {
                     log.info("kong zai....");
                 }
             } else {
                 log.info("current weight: {}", tons);
                 MineCartWeighTool.processWeight(equipNo, tons);
+                if (!atomicBoolean.get()) {
+                    lastFuel = tboxDataService.getFuelTotal();
+                }
                 atomicBoolean.set(true);
-                atomicLong.set(System.currentTimeMillis());
             }
 
             log.info("sendFlag:{} sampleFlag:{}, atomicBoolean：{}",
@@ -185,7 +203,7 @@ public class CanWeightReader {
             if (sendFlag && DataConfigManager.getInstance().isSampleFlag()) {
                 messageSendService.batchSendMsg2Kafka("kaugnche", deviceDataVOS);
                 atomicBoolean.set(false);
-                atomicLong.set(0L);
+                atomicLong.set(System.currentTimeMillis());
             }
 
         } else {

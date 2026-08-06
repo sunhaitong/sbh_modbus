@@ -1,5 +1,6 @@
 package com.chaos.mine.service;
 
+import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.KafkaUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,8 +48,9 @@ public class HeartService {
 
                     if (address instanceof Inet4Address) {
                         String ip = address.getHostAddress();
-
-                        KafkaUtils.send(kafkaHost, "heartbeat", "heartbeat","equipNo:" + equipNo + " IP:" + ip );
+                        if (DataConfigManager.getInstance().isOlineStatus()) {
+                            KafkaUtils.send(kafkaHost, "heartbeat", "heartbeat","equipNo:" + equipNo + " IP:" + ip );
+                        }
                     }
                 }
             }

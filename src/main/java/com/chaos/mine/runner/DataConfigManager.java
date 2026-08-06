@@ -45,7 +45,7 @@ public class DataConfigManager {
     private Map<Integer, DeviceInfo> temperatureDeviceInfoMap = new HashMap<>();
 
     public boolean isSampleFlag() {
-        return sampleFlag;
+        return true;
     }
 
     public void setSampleFlag(boolean sampleFlag) {
@@ -53,6 +53,14 @@ public class DataConfigManager {
     }
 
     private volatile boolean sampleFlag = false;
+
+    public boolean isOlineStatus() {
+        return olineStatus;
+    }
+
+    public void setOlineStatus(boolean olineStatus) {
+        this.olineStatus = olineStatus;
+    }
 
     private volatile boolean olineStatus = false;
 

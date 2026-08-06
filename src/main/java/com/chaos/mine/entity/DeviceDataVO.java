@@ -37,6 +37,8 @@ public class DeviceDataVO {
 
     private String kpiId;
 
+    private double fuelTotal;
+
     @JSONField(serialize = false,deserialize = false)
     public String getTag(){
         return equipNum+"_"+pointNum+"_"+paramNum;

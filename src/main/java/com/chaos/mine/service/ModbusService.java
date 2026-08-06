@@ -36,15 +36,153 @@ public class ModbusService {
     @Autowired
     private SerialConfig serialConfig;
 
+    @Autowired
+    private TboxDataService tboxDataService;
+
     @Value("${equip.no:test}")
     private String equipNo;
 
+    private volatile  double lastSingle;
+    private volatile long lastTime;
+    private volatile double lastFuel=0;
+    // 在类中添加一个标志位，记录是否已经执行过累清操作
+    private volatile boolean hasPerformedClearTotal = false;
     private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
     private final AtomicReference<Double> totalWeight = new AtomicReference<>(0.0);
     private final AtomicBoolean atomicBoolean = new AtomicBoolean(false);
     private final AtomicLong atomicLong = new AtomicLong(0L);
 
+    /**
+     * 执行累清操作（只在程序启动后第一次读取时执行）
+     */
+    private void performClearTotal() {
+        log.info("\n🚨 执行累清操作");
+        byte[] response = sendModbusCommand("01 06 00 82 00 00");
+
+        if (response.length >= 8) {
+            hasPerformedClearTotal = true;
+            log.info("✅ 累清成功");
+        } else {
+            log.warn("❌ 累清失败, 响应长度: {} 字节", response.length);
+        }
+    }
+
+    /**
+     * CRC16 Modbus校验
+     */
+    private int crc16Modbus(byte[] data) {
+        int crc = 0xFFFF;
+        for (byte b : data) {
+            crc ^= (b & 0xFF);
+            for (int i = 0; i < 8; i++) {
+                if ((crc & 0x0001) != 0) {
+                    crc = (crc >> 1) ^ 0xA001;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+        return crc;
+    }
+
+    /**
+     * 发送MODBUS指令（带CRC校验）
+     * @param cmdHex 不带CRC的十六进制命令，如 "01 06 00 82 00 00"
+     * @return 响应数据
+     */
+    private byte[] sendModbusCommand(String cmdHex) {
+        if (!serialPortManager.isOpen()) {
+            log.error("串口未打开，无法发送命令");
+            return new byte[0];
+        }
+
+        try {
+            // 1. 解析十六进制命令
+            byte[] rawCommand = hexStringToByteArray(cmdHex);
+
+            // 2. 计算CRC16（Modbus）
+            int crc = crc16Modbus(rawCommand);
+
+            // 3. 获取CRC的小端字节序（与Python crc.to_bytes(2, 'little') 一致）
+            byte[] crcBytes = new byte[2];
+            crcBytes[0] = (byte) (crc & 0xFF);         // 低字节
+            crcBytes[1] = (byte) ((crc >> 8) & 0xFF);  // 高字节
+
+            // 4. 构建完整帧（原命令 + CRC小端字节）
+            byte[] frame = new byte[rawCommand.length + 2];
+            System.arraycopy(rawCommand, 0, frame, 0, rawCommand.length);
+            System.arraycopy(crcBytes, 0, frame, rawCommand.length, 2);
+
+            // 4. 发送命令
+            log.info("📤 发送: {}", bytesToHex(frame));
+            serialPortManager.getOutputStream().write(frame);
+            serialPortManager.getOutputStream().flush();
+
+            // 5. 等待响应
+            Thread.sleep(100);
+
+            // 6. 读取响应
+            InputStream inputStream = serialPortManager.getInputStream();
+            ByteArrayOutputStream responseBuffer = new ByteArrayOutputStream();
+            if (inputStream != null && inputStream.available() > 0) {
+                byte[] temp = new byte[64];  // 最多读取64字节
+                int bytesRead = inputStream.read(temp);
+                if (bytesRead > 0) {
+                    responseBuffer.write(temp, 0, bytesRead);
+                    byte[] response = responseBuffer.toByteArray();
+                    log.info("📥 接收: {}", bytesToHex(response));
+                    return response;
+                }
+            } else {
+                log.warn("未收到命令响应");
+            }
+
+        } catch (Exception e) {
+            log.error("发送Modbus命令失败: {}", e.getMessage(), e);
+        }
+
+        return new byte[0];
+    }
+    /**
+     * 十六进制字符串转字节数组
+     * 支持 "01 06 00 82 00 00" 或 "010600820000" 格式
+     */
+    private byte[] hexStringToByteArray(String hex) {
+        String hexWithoutSpaces = hex.replaceAll("\\s", "");
+        int len = hexWithoutSpaces.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hexWithoutSpaces.charAt(i), 16) << 4)
+                    + Character.digit(hexWithoutSpaces.charAt(i + 1), 16));
+        }
+        return data;
+    }
+    /**
+     * 字节数组转十六进制字符串
+     */
+    private String bytesToHex(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(bytes.length, 100); i++) {
+            sb.append(String.format("%02X ", bytes[i] & 0xFF));
+        }
+        if (bytes.length > 100) {
+            sb.append("... (共").append(bytes.length).append("字节)");
+        }
+        return sb.toString().trim();
+    }
+
+
+
     public synchronized void readWeights() {
+        if (!hasPerformedClearTotal) {
+            performClearTotal();
+            lastTime = System.currentTimeMillis();
+            hasPerformedClearTotal = true;
+            lastFuel = tboxDataService.getFuelTotal();
+        }
         InputStream in = null;
         OutputStream out = null;
         try {
@@ -72,8 +210,25 @@ public class ModbusService {
                 int val = ((resp1[3] & 0xFF) << 24) | ((resp1[4] & 0xFF) << 16)
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
                 double weight = (double) val / 1000;
+                log.info("Single weight: {}", weight);
+                double curFuelTotal = tboxDataService.getFuelTotal();
 
-                if (weight < 2) {
+                DeviceDataVO single = new DeviceDataVO();
+                single.setEquipNum(equipNo);
+                single.setPointNum("02");
+                single.setParamNum("singleWeight");
+                single.setValue(weight);
+                single.setSampleTime(System.currentTimeMillis());
+                single.setRecvTime(lastTime);
+                single.setFuelTotal(curFuelTotal - lastFuel == 0 ? 0.5 : curFuelTotal - lastFuel);
+                deviceDataVOS.add(single);
+                if (lastSingle != weight) {
+                    sendFlag = true;
+                    lastSingle = weight;
+                    lastTime = System.currentTimeMillis();
+                    lastFuel = curFuelTotal;
+                }
+                /*if (weight < 2) {
                     log.info("weight < 2 send:{}", weight);
                     if (atomicBoolean.get()) {
                         log.info("Single weight: {}", weight);
@@ -94,7 +249,7 @@ public class ModbusService {
                     MineCartWeighTool.processWeight(equipNo, weight);
                     atomicBoolean.set(true);
                     atomicLong.set(System.currentTimeMillis());
-                }
+                }*/
                 singleWeight.set(weight);
             }
 
