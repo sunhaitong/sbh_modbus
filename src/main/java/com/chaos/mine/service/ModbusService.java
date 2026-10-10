@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -45,6 +44,9 @@ public class ModbusService {
     private volatile  double lastSingle;
     private volatile long lastTime;
     private volatile double lastFuel=0;
+    private volatile boolean lastFuelValid = false;      // 油耗基准是否已成功获取（与hasPerformedClearTotal解耦，互不阻塞重试）
+    @Value("${fuel.single.cycle.max.liter:50}")
+    private double maxReasonableFuelPerCycle;             // 单次作业合理油耗上限(L)，超过大概率是基准异常导致，先兜底拦一道
     // 在类中添加一个标志位，记录是否已经执行过累清操作
     private volatile boolean hasPerformedClearTotal = false;
     private final AtomicReference<Double> singleWeight = new AtomicReference<>(0.0);
@@ -55,15 +57,28 @@ public class ModbusService {
     /**
      * 执行累清操作（只在程序启动后第一次读取时执行）
      */
-    private void performClearTotal() {
+    private boolean performClearTotal() {
         log.info("\n🚨 执行累清操作");
         byte[] response = sendModbusCommand("01 06 00 82 00 00");
 
         if (response.length >= 8) {
-            hasPerformedClearTotal = true;
             log.info("✅ 累清成功");
+            return true;
         } else {
-            log.warn("❌ 累清失败, 响应长度: {} 字节", response.length);
+            log.warn("❌ 累清失败, 响应长度: {} 字节, 下次采集会重试", response.length);
+            return false;
+        }
+    }
+
+    /**
+     * 安全获取OBD累计油耗，异常时返回NaN，调用方需判断，不影响主流程
+     */
+    private double safeGetFuelTotal() {
+        try {
+            return tboxDataService.getFuelTotal();
+        } catch (Exception e) {
+            log.error("获取OBD累计油耗失败: {}", e.getMessage());
+            return Double.NaN;
         }
     }
 
@@ -178,13 +193,26 @@ public class ModbusService {
 
     public synchronized void readWeights() {
         if (!hasPerformedClearTotal) {
-            performClearTotal();
+            boolean cleared = performClearTotal();
             lastTime = System.currentTimeMillis();
-            hasPerformedClearTotal = true;
-            lastFuel = tboxDataService.getFuelTotal();
+            // 只有真的清零成功才置位；失败的话保持false，下一轮readWeights会自动重试，
+            // 不会像之前那样第一次失败就永久放弃（问题2）
+            if (cleared) {
+                hasPerformedClearTotal = true;
+            }
         }
-        InputStream in = null;
-        OutputStream out = null;
+        // 油耗基准初始化跟累清是两件独立的事，用独立的标志位+安全读取，
+        // 一次获取失败不会导致这一轮采集整体中断，也不会永久卡死在lastFuel=0（问题4）
+        if (!lastFuelValid) {
+            double fuel = safeGetFuelTotal();
+            if (!Double.isNaN(fuel)) {
+                lastFuel = fuel;
+                lastFuelValid = true;
+            } else {
+                log.warn("油耗基准获取失败，下一轮会重试");
+            }
+        }
+
         try {
             // 确保串口可用
             if (!serialPortManager.ensureSerialPortOpen()) {
@@ -192,9 +220,10 @@ public class ModbusService {
                 return;
             }
 
-            // 获取输出流和输入流
-            out = serialPortManager.getOutputStream();
-            in = serialPortManager.getInputStream();
+            // 获取输出流和输入流（该串口为本设备专属，不与其他任务共用，
+            // 保持长连接，不在每轮采集结束后关闭——避免频繁开关串口带来的时序问题和额外开销）
+            OutputStream out = serialPortManager.getOutputStream();
+            InputStream in = serialPortManager.getInputStream();
 
             // 读单铲重量 0x01 0x03 0x00 0x00 0x00 0x02
             byte[] cmd1 = new byte[]{0x01, 0x03, 0x00, 0x00, 0x00, 0x02};
@@ -211,7 +240,32 @@ public class ModbusService {
                         | ((resp1[5] & 0xFF) << 8) | (resp1[6] & 0xFF);
                 double weight = (double) val / 1000;
                 log.info("Single weight: {}", weight);
-                double curFuelTotal = tboxDataService.getFuelTotal();
+                double curFuelTotal = safeGetFuelTotal();
+                boolean fuelReadOk = lastFuelValid && !Double.isNaN(curFuelTotal);
+                double fuelConsumed = 0;
+
+                if (fuelReadOk) {
+                    fuelConsumed = curFuelTotal - lastFuel;
+                    if (fuelConsumed < 0) {
+                        // OBD计数器理论上单调递增，出现负数大概率是计数器被重置
+                        log.warn("油耗计算出现负值(lastFuel={}, curFuelTotal={})，本次记0",
+                                String.format("%.2f", lastFuel), String.format("%.2f", curFuelTotal));
+                        fuelConsumed = 0;
+                    } else if (fuelConsumed > maxReasonableFuelPerCycle) {
+                        // 单次作业不可能消耗这么多油，大概率是lastFuel基准异常（例如曾经卡在0，
+                        // 这次算出来的是整车累计油耗）。先按0处理，避免污染这一条记录，
+                        // 同时打印足够信息方便定位是哪次基准出的问题
+                        log.warn("单次油耗{}超过合理上限{}L，怀疑基准异常(lastFuel={}, curFuelTotal={})，本次记0",
+                                String.format("%.2f", fuelConsumed), maxReasonableFuelPerCycle,
+                                String.format("%.2f", lastFuel), String.format("%.2f", curFuelTotal));
+                        fuelConsumed = 0;
+                    } else if (fuelConsumed == 0) {
+                        // 业务确认：0是不合法的值，短时间内OBD计数器未跳表时用0.5兜底
+                        fuelConsumed = 0.5;
+                    }
+                } else {
+                    log.warn("油耗基准或当前读数无效，本次油耗记为0（lastFuelValid={}）", lastFuelValid);
+                }
 
                 DeviceDataVO single = new DeviceDataVO();
                 single.setEquipNum(equipNo);
@@ -220,13 +274,18 @@ public class ModbusService {
                 single.setValue(weight);
                 single.setSampleTime(System.currentTimeMillis());
                 single.setRecvTime(lastTime);
-                single.setFuelTotal(curFuelTotal - lastFuel == 0 ? 0.5 : curFuelTotal - lastFuel);
+                single.setFuelTotal(fuelConsumed);
                 deviceDataVOS.add(single);
                 if (lastSingle != weight) {
                     sendFlag = true;
                     lastSingle = weight;
                     lastTime = System.currentTimeMillis();
-                    lastFuel = curFuelTotal;
+                    // 每条记录都是独立、已闭环的作业周期，不能把油耗挪到下一条上去算，
+                    // 所以这里每次都要推进基线——不管这次差值是0还是超过上限，
+                    // 否则下一条记录的差值会把这次的量级也叠加进去，造成新的异常
+                    if (fuelReadOk) {
+                        lastFuel = curFuelTotal;
+                    }
                 }
                 /*if (weight < 2) {
                     log.info("weight < 2 send:{}", weight);
@@ -285,21 +344,6 @@ public class ModbusService {
 
         } catch (Exception e) {
             log.error("读取重量失败", e);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
         }
     }
 

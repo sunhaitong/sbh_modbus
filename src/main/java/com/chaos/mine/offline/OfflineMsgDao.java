@@ -37,6 +37,11 @@ public class OfflineMsgDao {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_create_time ON offline_msg(create_time)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_topic ON offline_msg(topic)");
 
+            stmt.execute("CREATE TABLE IF NOT EXISTS last_fuel (" +
+                    "equip_no TEXT PRIMARY KEY," +
+                    "fuel_total DOUBLE NOT NULL," +
+                    "update_time LONG NOT NULL)");
+
             // 优化 SQLite 配置
             stmt.execute("PRAGMA journal_mode = WAL");
             stmt.execute("PRAGMA synchronous = NORMAL");
@@ -339,6 +344,43 @@ public class OfflineMsgDao {
     }
 
 
+
+    public void updateLastFuel(String equipNo, double fuelTotal) {
+        String sql = "INSERT INTO last_fuel(equip_no, fuel_total, update_time) VALUES(?,?,?) " +
+                "ON CONFLICT(equip_no) DO UPDATE SET fuel_total=excluded.fuel_total, update_time=excluded.update_time";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, equipNo);
+            ps.setDouble(2, fuelTotal);
+            ps.setLong(3, System.currentTimeMillis());
+            ps.executeUpdate();
+
+        } catch (Exception e) {
+            log.error("updateLastFuel error, equipNo={}, fuelTotal={}", equipNo, fuelTotal, e);
+        }
+    }
+
+    public Double getLastFuel(String equipNo) {
+        String sql = "SELECT fuel_total FROM last_fuel WHERE equip_no=?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, equipNo);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("fuel_total");
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("getLastFuel error, equipNo={}", equipNo, e);
+        }
+
+        return null;
+    }
 
     /**
      * 删除一天前的数据（优化版）

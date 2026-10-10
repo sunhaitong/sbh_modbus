@@ -1,6 +1,7 @@
 package com.chaos.mine.service;
 
 import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.offline.OfflineMsgDao;
 import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.runner.SerialConfig;
 import com.chaos.mine.runner.SerialPortManager;
@@ -39,6 +40,9 @@ public class RS485WeightMonitor {
 
     @Autowired
     private TboxDataService tboxDataService;
+
+    @Autowired
+    private OfflineMsgDao offlineMsgDao;
 
     @Value("${equip.no:test}")
     private String equipNo;
@@ -166,11 +170,14 @@ public class RS485WeightMonitor {
      */
     public void readSerialData() {
 
-        // 第一次调用时执行累清操作
-        /*if (!hasPerformedClearTotal) {
-            // performClearTotal();
-
-        }*/
+        // 第一次调用时初始化油耗基准
+        if (!hasPerformedClearTotal) {
+            Double dbLastFuel = offlineMsgDao.getLastFuel(equipNo);
+            if (dbLastFuel != null) {
+                lastFuel = dbLastFuel;
+            }
+            hasPerformedClearTotal = true;
+        }
 
         InputStream inputStream = serialPortManager.getInputStream();
         if (inputStream == null) {
@@ -434,6 +441,7 @@ public class RS485WeightMonitor {
             currentPeakWeight = weightT;
             currentPeakTime = currentLoadStartTime;
             lastFuel = tboxDataService.getFuelTotal();
+            offlineMsgDao.updateLastFuel(equipNo, lastFuel);
 
             // 调用工具类记录重量
             MineCartWeighTool.processWeight(equipNo, weightT);

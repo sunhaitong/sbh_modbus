@@ -1,6 +1,7 @@
 package com.chaos.mine.service;
 
 import com.chaos.mine.entity.DeviceDataVO;
+import com.chaos.mine.offline.OfflineMsgDao;
 import com.chaos.mine.runner.DataConfigManager;
 import com.chaos.mine.util.MineCartWeighTool;
 import com.sun.jna.*;
@@ -49,6 +50,9 @@ public class CanWeightReader {
 
     @Autowired
     private TboxDataService tboxDataService;
+
+    @Autowired
+    private OfflineMsgDao offlineMsgDao;
 
     private volatile boolean loadingSatus= false;
 
@@ -160,6 +164,10 @@ public class CanWeightReader {
     public void getLatestWeightTons() {
         if (!hasPerformedClearTotal) {
             atomicLong.set(System.currentTimeMillis());
+            Double dbLastFuel = offlineMsgDao.getLastFuel(equipNo);
+            if (dbLastFuel != null) {
+                lastFuel = dbLastFuel;
+            }
             hasPerformedClearTotal = true;
 
         }
@@ -169,6 +177,7 @@ public class CanWeightReader {
             List<DeviceDataVO> deviceDataVOS = new ArrayList<>();
             boolean sendFlag = false;
             if (tons < 2) {
+                loadingSatus = false;
                 log.info("weight < 2 send:{}", tons);
                 if (atomicBoolean.get()) {
                     log.info("Single weight: {}", tons);
@@ -190,8 +199,10 @@ public class CanWeightReader {
             } else {
                 log.info("current weight: {}", tons);
                 MineCartWeighTool.processWeight(equipNo, tons);
-                if (!atomicBoolean.get()) {
+                if (!loadingSatus) {
                     lastFuel = tboxDataService.getFuelTotal();
+                    offlineMsgDao.updateLastFuel(equipNo, lastFuel);
+                    loadingSatus = true;
                 }
                 atomicBoolean.set(true);
             }
